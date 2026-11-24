@@ -1717,15 +1717,13 @@ function shikaReports() {
     async loadDashboardAll() {
       this.busy = true;
       try {
-        const jobs = [
-          this.loadOverview(),
-          this.loadSalesHistory(),
-          this.loadCatalogData(),
-          this.loadRoasteryData(),
-          this.loadPurchases(),
-        ];
-        if (this.isAdmin()) jobs.push(this.loadUsers());
-        await Promise.all(jobs);
+        await this.loadOverview();
+        if (!this.token) return;
+        await Promise.all([this.loadSalesHistory(), this.loadCatalogData()]);
+        if (!this.token) return;
+        const tail = [this.loadRoasteryData(), this.loadPurchases()];
+        if (this.isAdmin()) tail.push(this.loadUsers());
+        await Promise.all(tail);
       } catch (err) {
         if (this.token) this.notify(err.message || 'Could not refresh dashboard data.', 'error');
       } finally {
