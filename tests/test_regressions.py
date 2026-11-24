@@ -565,24 +565,30 @@ def test_qris_simulation_pay_and_timeout(seeded_db, cashier_headers, monkeypatch
     assert sess["session_id"] in pay_page.text
     assert "qris-pay-btn" in pay_page.text
 
-    # 4. Paying within 5m succeeds and POS poll immediately observes 'paid'
+    # 4. Paying within 5m succeeds and POS poll immediately observes 'paid' (persisted in Postgres, no-store)
     paid = client.post(f"/sales/qris/sessions/{sess['session_id']}/pay")
     assert paid.status_code == 200
     assert paid.json()["status"] == "paid"
     polled = client.get(f"/sales/qris/sessions/{sess['session_id']}")
     assert polled.status_code == 200
+    assert polled.headers.get("cache-control") == "no-store"
     assert polled.json()["status"] == "paid"
+    with seeded_db.cursor() as cur:
+        cur.execute("SELECT status FROM qris_sessions WHERE session_id = %s", (sess["session_id"],))
+        assert cur.fetchone()[0] == "paid"
 
     # 5. Timeout after 5 minutes (300s) marks session expired and blocks payment with 410 Gone
-    clock = [1000.0]
-    monkeypatch.setattr(qris.time, "monotonic", lambda: clock[0])
+    from datetime import datetime, timedelta, timezone
+
+    clock = [datetime(2026, 11, 24, 10, 0, 0, tzinfo=timezone.utc)]
+    monkeypatch.setattr(qris, "_utcnow", lambda: clock[0])
     s2 = client.post(
         "/sales/qris/sessions",
         headers=cashier_headers,
         json={"amount": "32000.00", "customer_name": "Walk-in"},
     ).json()
     assert s2["status"] == "pending"
-    clock[0] += 300.1
+    clock[0] = clock[0] + timedelta(seconds=301)
     expired_poll = client.get(f"/sales/qris/sessions/{s2['session_id']}")
     assert expired_poll.status_code == 200
     assert expired_poll.json()["status"] == "expired"
@@ -1009,6 +1015,27 @@ def test_authenticated_route_uses_single_db_connection(seeded_db, manager_header
     res = client.get("/reports/dashboard", headers=manager_headers)
     assert res.status_code == 200
     assert checkouts == 1
+
+
+def test_supabase_public_bucket_image_resolution(seeded_db, monkeypatch):
+    with seeded_db, seeded_db.cursor() as cur:
+        cur.execute("UPDATE products SET image_url = '/static/images/menu/hot-latte.png' WHERE id = 1")
+
+    monkeypatch.setenv("SUPABASE_URL", "https://demo-ref.supabase.co")
+    monkeypatch.setenv("SUPABASE_STORAGE_BUCKET", "shika-uploads")
+    expected_base = "https://demo-ref.supabase.co/storage/v1/object/public/shika-uploads"
+
+    landing_html = client.get("/").text
+    assert f"{expected_base}/shika-logo.png" in landing_html
+    assert f"{expected_base}/mascot.png" in landing_html
+    assert f'window.SHIKA_IMG_BASE = "{expected_base}"' in landing_html
+
+    menu = client.get("/menu/products").json()
+    assert menu[0]["image_url"] == f"{expected_base}/menu/hot-latte.png"
+
+    redir = client.get("/static/images/shika-logo.png", follow_redirects=False)
+    assert redir.status_code == 307
+    assert redir.headers["location"] == f"{expected_base}/shika-logo.png"
 
 
 def test_migrate_existing_images_to_supabase_bucket(seeded_db, monkeypatch):

@@ -54,7 +54,7 @@ def seeded_db():
                 TRUNCATE user_oauth_accounts, users, categories, products, units, suppliers,
                          raw_materials, product_recipes, sales, sale_items,
                          material_purchases, material_purchase_items, stock_mutations,
-                         shift_notes
+                         shift_notes, qris_sessions
                 RESTART IDENTITY CASCADE;
                 ALTER SEQUENCE invoice_number_seq RESTART WITH 1;
                 ALTER SEQUENCE po_number_seq RESTART WITH 1;
