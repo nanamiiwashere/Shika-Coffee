@@ -66,7 +66,9 @@ def login(body: LoginRequest, db: PgConnection = Depends(get_db)):
     if not user["is_active"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account inactive")
     return _private_response(JSONResponse({
-        "access_token": create_access_token(user["id"], user["role"]), "token_type": "bearer",
+        "access_token": create_access_token(user["id"], user["role"]),
+        "token_type": "bearer",
+        "role": user["role"],
     }))
 
 
@@ -126,7 +128,11 @@ def oauth_session(request: Request, db: PgConnection = Depends(get_db)):
         user = cast(dict[str, Any] | None, cur.fetchone())
     if not user or not user["is_active"]:
         return reply({"detail": "Account inactive or not found"}, 403)
-    return reply({"access_token": create_access_token(user["id"], user["role"]), "token_type": "bearer"})
+    return reply({
+        "access_token": create_access_token(user["id"], user["role"]),
+        "token_type": "bearer",
+        "role": user["role"],
+    })
 
 
 @router.get("/auth/oauth/{provider}")
