@@ -8,7 +8,7 @@ from psycopg2.extensions import connection as PgConnection
 
 from app.database import get_raw_db as get_db
 from app.schemas import AvatarUploadRequest, LoginRequest, ProfileUpdate, RegisterRequest, UserCreate, UserUpdate
-from app.uploads import remove_local_upload, save_local_image
+from app.uploads import remove_local_upload, resolve_row_images, resolve_rows_images, save_local_image
 from app.security import (
     OAUTH_CONFIG,
     OAUTH_COOKIE_SECURE,
@@ -285,7 +285,7 @@ def _build_me_profile(user_id: int, db: PgConnection) -> dict[str, Any]:
         )
         oauth_rows = [dict(r) for r in cur.fetchall()]
 
-    profile = dict(row)
+    profile = resolve_row_images(dict(row), "avatar_url") or dict(row)
     methods: list[str] = []
     if profile["has_password"]:
         methods.append("password")
@@ -445,7 +445,7 @@ def unlink_my_oauth(
 def list_users(db: PgConnection = Depends(get_db)):
     with db.cursor() as cur:
         cur.execute("SELECT id, email, username, full_name, avatar_url, role, is_active, created_at FROM users ORDER BY id")
-        return cur.fetchall()
+        return resolve_rows_images(cur.fetchall(), "avatar_url")
 
 
 @router.get("/users/{user_id}", dependencies=[Depends(require_role("admin"))])
@@ -458,7 +458,7 @@ def get_user(user_id: int, db: PgConnection = Depends(get_db)):
         row = cur.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="User not found")
-    return row
+    return resolve_row_images(row, "avatar_url")
 
 
 @router.post("/users", status_code=201, dependencies=[Depends(require_role("admin"))])

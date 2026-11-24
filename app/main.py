@@ -1,14 +1,16 @@
 from pathlib import Path
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from psycopg2 import IntegrityError as PgIntegrityError
 from psycopg2.errors import CheckViolation, ForeignKeyViolation, RestrictViolation, UniqueViolation
 from sqlalchemy.exc import IntegrityError
-from app.config import CORS_ORIGINS
+from app.config import CORS_ORIGINS, IS_VERCEL, MISSING_ENV_VARS
+from app.database import DB_INIT_ERROR
 from app.routers import auth, inventory, master, reports, sales
+from app.uploads import public_image_base, resolve_image_url
 
 app = FastAPI(title="Shika Coffee POS & Inventory API")
 
@@ -22,8 +24,28 @@ app.add_middleware(
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "app" / "static"
+TEMPLATES_DIR = BASE_DIR / "app" / "templates"
+
+
+@app.get("/static/images/{asset_path:path}", include_in_schema=False)
+def static_image_asset(asset_path: str):
+    cleaned = asset_path.lstrip("/")
+    if not cleaned or ".." in cleaned.split("/"):
+        raise HTTPException(status_code=404, detail="Not Found")
+    resolved = resolve_image_url(f"/static/images/{cleaned}")
+    if resolved and resolved.startswith("http"):
+        return RedirectResponse(resolved, status_code=307, headers={"Cache-Control": "public, max-age=86400"})
+    images_root = (STATIC_DIR / "images").resolve()
+    file_path = (images_root / cleaned).resolve()
+    if file_path.is_relative_to(images_root) and file_path.is_file():
+        return FileResponse(file_path)
+    raise HTTPException(status_code=404, detail="Not Found")
+
+
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR), check_dir=False), name="static")
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+templates.env.globals["img_base"] = public_image_base
+templates.env.globals["img_url"] = lambda rel: f"{public_image_base()}/{str(rel).lstrip('/')}"
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -83,6 +105,16 @@ def integrity_error_handler(_: Request, exc: Exception):
 
 @app.get("/health")
 def health():
+    if IS_VERCEL and (MISSING_ENV_VARS or DB_INIT_ERROR or not TEMPLATES_DIR.is_dir()):
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "misconfigured",
+                "missing_env_vars": MISSING_ENV_VARS,
+                "db_error": DB_INIT_ERROR,
+                "templates_present": TEMPLATES_DIR.is_dir(),
+            },
+        )
     return {"status": "ok"}
 
 

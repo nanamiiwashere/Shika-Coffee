@@ -19,6 +19,46 @@ def _supabase_storage_cfg() -> tuple[str, str, str]:
     return url, key, bucket
 
 
+def public_image_base() -> str:
+    """Return Supabase public bucket base URL when SUPABASE_URL is set, else local '/static/images'."""
+    sb_url, _, bucket = _supabase_storage_cfg()
+    if sb_url:
+        return f"{sb_url}/storage/v1/object/public/{bucket}"
+    return "/static/images"
+
+
+def resolve_image_url(url: str | None) -> str | None:
+    """Map '/static/images/<rel>' to the Supabase public bucket URL when SUPABASE_URL is configured."""
+    if not url or not isinstance(url, str):
+        return url
+    cleaned = url.strip()
+    if cleaned.startswith("/static/images/"):
+        sb_url, _, bucket = _supabase_storage_cfg()
+        if sb_url:
+            rel = cleaned[len("/static/images/") :].lstrip("/")
+            if rel and ".." not in rel:
+                return f"{sb_url}/storage/v1/object/public/{bucket}/{rel}"
+    return url
+
+
+def resolve_row_images(row: dict | None, *keys: str) -> dict | None:
+    if row is None:
+        return None
+    for key in keys:
+        val = row.get(key)
+        if isinstance(val, str) and val.startswith("/static/images/"):
+            row[key] = resolve_image_url(val)
+    return row
+
+
+def resolve_rows_images(rows: list[dict], *keys: str) -> list[dict]:
+    if not _supabase_storage_cfg()[0]:
+        return rows
+    for row in rows:
+        resolve_row_images(row, *keys)
+    return rows
+
+
 def is_allowed_image_url(url: str) -> bool:
     cleaned = url.strip()
     if cleaned.startswith("/") and not cleaned.startswith("//"):

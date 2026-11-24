@@ -186,7 +186,8 @@
   const status = menu.querySelector('[data-landing-menu-status]');
   const retry = menu.querySelector('[data-landing-menu-retry]');
   const grid = menu.querySelector('[data-landing-menu-grid]');
-  const placeholder = '/static/images/product-placeholder.svg';
+  const imgBase = (typeof window !== 'undefined' && window.SHIKA_IMG_BASE) || '/static/images';
+  const placeholder = `${imgBase}/product-placeholder.svg`;
   let products = [];
 
   let loading = false;
@@ -200,8 +201,10 @@
 
   const productImageUrl = (value) => {
     if (typeof value !== 'string' || !value.trim()) return placeholder;
+    const raw = value.trim();
+    const mapped = raw.startsWith('/static/images/') ? `${imgBase}/${raw.slice('/static/images/'.length)}` : raw;
     try {
-      const url = new URL(value, window.location.origin);
+      const url = new URL(mapped, window.location.origin);
       return ['http:', 'https:'].includes(url.protocol) ? url.href : placeholder;
     } catch {
       return placeholder;

@@ -532,7 +532,7 @@
                   <template x-for="p in filteredProducts" :key="'mp-' + p.id">
                     <button type="button" class="adm-menu-row" :class="{ 'is-selected': selectedProductId === p.id }" @click="selectProduct(p)">
                       <div class="adm-menu-thumb">
-                        <img :src="productImage(p)" :alt="p.name" width="44" height="44" loading="lazy" @error.once="$el.src = '/static/images/product-placeholder.svg'">
+                        <img :src="productImage(p)" :alt="p.name" width="44" height="44" loading="lazy" @error.once="$el.src = '{{ img_url('product-placeholder.svg') }}'">
                       </div>
                       <div class="adm-menu-row-copy">
                         <div class="adm-menu-row-top">
@@ -554,7 +554,7 @@
                     <div>
                       <div class="adm-detail-hero">
                         <div class="adm-detail-photo">
-                          <img :src="productImage(selectedProduct)" :alt="selectedProduct.name" width="136" height="102" @error.once="$el.src = '/static/images/product-placeholder.svg'">
+                          <img :src="productImage(selectedProduct)" :alt="selectedProduct.name" width="136" height="102" @error.once="$el.src = '{{ img_url('product-placeholder.svg') }}'">
                         </div>
                         <div style="flex:1; min-width:0;">
                           <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
@@ -1081,7 +1081,7 @@
                         <div class="adm-rank-left">
                           <span class="adm-rank-num" x-text="'#' + (idx + 1)"></span>
                           <span class="adm-lot-thumb" aria-hidden="true">
-                            <img :src="productImage(item)" alt="" width="36" height="36" loading="lazy" @error.once="$el.src = '/static/images/product-placeholder.svg'">
+                            <img :src="productImage(item)" alt="" width="36" height="36" loading="lazy" @error.once="$el.src = '{{ img_url('product-placeholder.svg') }}'">
                           </span>
                           <div style="min-width:0;">
                             <strong class="adm-cell-main" x-text="item.product_name"></strong>
@@ -1332,7 +1332,7 @@
       </div>
       <div class="adm-profile-banner">
         <span class="adm-upload-preview" aria-hidden="true">
-          <img :src="productForm.image_url || '/static/images/product-placeholder.svg'" alt="" width="48" height="48" @error="$el.src = '/static/images/product-placeholder.svg'">
+          <img :src="productForm.image_url || '{{ img_url('product-placeholder.svg') }}'" alt="" width="48" height="48" @error="$el.src = '{{ img_url('product-placeholder.svg') }}'">
         </span>
         <div class="adm-profile-identity">
           <strong>Item Photo</strong>

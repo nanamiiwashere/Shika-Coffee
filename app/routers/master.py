@@ -18,7 +18,7 @@ from app.schemas import (
     UnitUpdate,
 )
 from app.security import get_current_user, require_role
-from app.uploads import is_allowed_image_url, remove_local_upload, save_local_image
+from app.uploads import is_allowed_image_url, remove_local_upload, resolve_row_images, resolve_rows_images, save_local_image
 
 router = APIRouter(tags=["Master Data"])
 ADMIN_OR_MGR = [Depends(require_role("admin", "manager"))]
@@ -92,7 +92,7 @@ def list_menu_products(db: PgConnection = Depends(get_db)):
             ORDER BY c.name, p.name
             """
         )
-        return cur.fetchall()
+        return resolve_rows_images(cur.fetchall(), "image_url")
 
 
 # --- Products (Soft-delete only) ---
@@ -132,7 +132,7 @@ def list_products(
             """,
             params,
         )
-        return cur.fetchall()
+        return resolve_rows_images(cur.fetchall(), "image_url")
 
 
 @router.get("/products/{product_id}", dependencies=AUTHENTICATED)
@@ -145,7 +145,7 @@ def get_product(product_id: int, db: PgConnection = Depends(get_db)):
         row = cur.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Product not found")
-    return row
+    return resolve_row_images(row, "image_url")
 
 
 @router.post("/products/upload-image", dependencies=ADMIN_OR_MGR)
@@ -248,7 +248,7 @@ def list_raw_materials(db: PgConnection = Depends(get_db)):
             ORDER BY rm.name
             """
         )
-        return cur.fetchall()
+        return resolve_rows_images(cur.fetchall(), "image_url")
 
 
 @router.get("/raw-materials/{material_id}", dependencies=AUTHENTICATED)
@@ -261,7 +261,7 @@ def get_raw_material(material_id: int, db: PgConnection = Depends(get_db)):
         row = cur.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Raw material not found")
-    return row
+    return resolve_row_images(row, "image_url")
 
 
 @router.post("/raw-materials/upload-image", dependencies=ADMIN_OR_MGR)

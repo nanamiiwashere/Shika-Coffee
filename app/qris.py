@@ -5,111 +5,194 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import secrets
-import threading
-import time
 from typing import Any
 
 from fastapi import HTTPException
+from psycopg2.extensions import connection as PgConnection
 
 QRIS_DEFAULT_TIMEOUT = 300
 _PRUNE_AFTER_SECONDS = 1800
+_TABLE_ENSURED = False
 
-# ponytail: single-process in-memory store with global lock for ephemeral 5s QRIS simulations;
-# move to Redis or a PostgreSQL table if running multiple Uvicorn workers.
-_LOCK = threading.Lock()
-_SESSIONS: dict[str, dict[str, Any]] = {}
+_CREATE_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS qris_sessions (
+    session_id VARCHAR(32) PRIMARY KEY,
+    user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
+    customer_name VARCHAR(100) NOT NULL DEFAULT 'Walk-in',
+    timeout_seconds INTEGER NOT NULL DEFAULT 300 CHECK (timeout_seconds > 0),
+    status VARCHAR(16) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'expired', 'cancelled')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMPTZ NOT NULL,
+    paid_at TIMESTAMPTZ
+)
+"""
 
 
-def _prune_old(now_mono: float) -> None:
-    stale = [sid for sid, s in _SESSIONS.items() if now_mono - s["created_mono"] > _PRUNE_AFTER_SECONDS]
-    for sid in stale:
-        _SESSIONS.pop(sid, None)
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
-def _serialize_session(s: dict[str, Any], now_mono: float) -> dict[str, Any]:
-    remaining = max(0.0, round(s["expires_mono"] - now_mono, 2))
-    status = s["status"]
+def _ensure_table(db: PgConnection) -> None:
+    global _TABLE_ENSURED
+    if _TABLE_ENSURED:
+        return
+    with db, db.cursor() as cur:
+        cur.execute(_CREATE_TABLE_SQL)
+    _TABLE_ENSURED = True
+
+
+def _serialize_session(row: dict[str, Any], now_dt: datetime) -> dict[str, Any]:
+    expires_at = row["expires_at"]
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    remaining = max(0.0, round((expires_at - now_dt).total_seconds(), 2))
+    status = row["status"]
     if status == "pending" and remaining <= 0.0:
         status = "expired"
-        s["status"] = "expired"
+    created_at = row["created_at"]
+    paid_at = row["paid_at"]
     return {
-        "session_id": s["session_id"],
+        "session_id": row["session_id"],
         "status": status,
-        "amount": str(s["amount"]),
-        "customer_name": s["customer_name"],
-        "timeout_seconds": s["timeout_seconds"],
+        "amount": str(Decimal(str(row["amount"])).quantize(Decimal("0.01"))),
+        "customer_name": row["customer_name"],
+        "timeout_seconds": int(row["timeout_seconds"]),
         "remaining_seconds": remaining if status == "pending" else 0.0,
-        "created_at": s["created_at"],
-        "expires_at": s["expires_at"],
-        "paid_at": s["paid_at"],
-        "pay_path": f"/pos/qris-pay/{s['session_id']}",
+        "created_at": created_at.isoformat() if isinstance(created_at, datetime) else created_at,
+        "expires_at": expires_at.isoformat(),
+        "paid_at": paid_at.isoformat() if isinstance(paid_at, datetime) else paid_at,
+        "pay_path": f"/pos/qris-pay/{row['session_id']}",
     }
 
 
 def create_qris_session(
+    db: PgConnection,
     amount: Decimal,
     customer_name: str,
     user_id: int,
     timeout_seconds: int = QRIS_DEFAULT_TIMEOUT,
 ) -> dict[str, Any]:
-    now_mono = time.monotonic()
-    now_dt = datetime.now(timezone.utc)
+    _ensure_table(db)
+    now_dt = _utcnow()
+    expires_dt = now_dt + timedelta(seconds=timeout_seconds)
+    cutoff_dt = now_dt - timedelta(seconds=_PRUNE_AFTER_SECONDS)
     sid = f"QRIS-{secrets.token_hex(6).upper()}"
-    entry = {
-        "session_id": sid,
-        "user_id": user_id,
-        "amount": Decimal(str(amount)).quantize(Decimal("0.01")),
-        "customer_name": customer_name,
-        "timeout_seconds": timeout_seconds,
-        "status": "pending",
-        "created_mono": now_mono,
-        "expires_mono": now_mono + timeout_seconds,
-        "created_at": now_dt.isoformat(),
-        "expires_at": (now_dt + timedelta(seconds=timeout_seconds)).isoformat(),
-        "paid_at": None,
-    }
-    with _LOCK:
-        _prune_old(now_mono)
-        _SESSIONS[sid] = entry
-        return _serialize_session(entry, now_mono)
+    amt = Decimal(str(amount)).quantize(Decimal("0.01"))
+    with db, db.cursor() as cur:
+        cur.execute("DELETE FROM qris_sessions WHERE created_at < %s", (cutoff_dt,))
+        cur.execute(
+            """
+            INSERT INTO qris_sessions (
+                session_id, user_id, amount, customer_name, timeout_seconds, status, created_at, expires_at
+            ) VALUES (%s, %s, %s, %s, %s, 'pending', %s, %s)
+            RETURNING session_id, user_id, amount, customer_name, timeout_seconds, status, created_at, expires_at, paid_at
+            """,
+            (sid, user_id, amt, customer_name, timeout_seconds, now_dt, expires_dt),
+        )
+        row = cur.fetchone()
+    return _serialize_session(dict(row), now_dt)
 
 
-def get_qris_session(session_id: str) -> dict[str, Any]:
-    now_mono = time.monotonic()
-    with _LOCK:
-        entry = _SESSIONS.get(session_id)
-        if not entry:
+def get_qris_session(db: PgConnection, session_id: str) -> dict[str, Any]:
+    _ensure_table(db)
+    now_dt = _utcnow()
+    with db, db.cursor() as cur:
+        cur.execute(
+            """
+            SELECT session_id, user_id, amount, customer_name, timeout_seconds, status, created_at, expires_at, paid_at
+            FROM qris_sessions
+            WHERE session_id = %s
+            """,
+            (session_id,),
+        )
+        row = cur.fetchone()
+        if not row:
             raise HTTPException(status_code=404, detail="QRIS session not found")
-        return _serialize_session(entry, now_mono)
+        entry = dict(row)
+        expires_at = entry["expires_at"]
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if entry["status"] == "pending" and now_dt >= expires_at:
+            cur.execute(
+                "UPDATE qris_sessions SET status = 'expired' WHERE session_id = %s AND status = 'pending'",
+                (session_id,),
+            )
+            entry["status"] = "expired"
+    return _serialize_session(entry, now_dt)
 
 
-def pay_qris_session(session_id: str) -> dict[str, Any]:
-    now_mono = time.monotonic()
-    with _LOCK:
-        entry = _SESSIONS.get(session_id)
-        if not entry:
+def pay_qris_session(db: PgConnection, session_id: str) -> dict[str, Any]:
+    _ensure_table(db)
+    now_dt = _utcnow()
+    with db, db.cursor() as cur:
+        cur.execute(
+            """
+            SELECT session_id, user_id, amount, customer_name, timeout_seconds, status, created_at, expires_at, paid_at
+            FROM qris_sessions
+            WHERE session_id = %s
+            FOR UPDATE
+            """,
+            (session_id,),
+        )
+        row = cur.fetchone()
+        if not row:
             raise HTTPException(status_code=404, detail="QRIS session not found")
+        entry = dict(row)
         if entry["status"] == "paid":
-            return _serialize_session(entry, now_mono)
+            return _serialize_session(entry, now_dt)
         if entry["status"] == "cancelled":
             raise HTTPException(status_code=409, detail="QRIS session was cancelled")
-        if entry["status"] == "expired" or now_mono >= entry["expires_mono"]:
-            entry["status"] = "expired"
-            raise HTTPException(status_code=410, detail="QRIS session expired (timeout)")
-        entry["status"] = "paid"
-        entry["paid_at"] = datetime.now(timezone.utc).isoformat()
-        return _serialize_session(entry, now_mono)
+        expires_at = entry["expires_at"]
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if entry["status"] == "expired" or now_dt >= expires_at:
+            cur.execute(
+                "UPDATE qris_sessions SET status = 'expired' WHERE session_id = %s AND status = 'pending'",
+                (session_id,),
+            )
+            expired = True
+        else:
+            expired = False
+            cur.execute(
+                """
+                UPDATE qris_sessions
+                SET status = 'paid', paid_at = %s
+                WHERE session_id = %s
+                RETURNING session_id, user_id, amount, customer_name, timeout_seconds, status, created_at, expires_at, paid_at
+                """,
+                (now_dt, session_id),
+            )
+            updated = dict(cur.fetchone())
+    if expired:
+        raise HTTPException(status_code=410, detail="QRIS session expired (timeout)")
+    return _serialize_session(updated, now_dt)
 
 
-def cancel_qris_session(session_id: str) -> dict[str, Any]:
-    now_mono = time.monotonic()
-    with _LOCK:
-        entry = _SESSIONS.get(session_id)
-        if not entry:
+def cancel_qris_session(db: PgConnection, session_id: str) -> dict[str, Any]:
+    _ensure_table(db)
+    now_dt = _utcnow()
+    with db, db.cursor() as cur:
+        cur.execute(
+            """
+            SELECT session_id, user_id, amount, customer_name, timeout_seconds, status, created_at, expires_at, paid_at
+            FROM qris_sessions
+            WHERE session_id = %s
+            FOR UPDATE
+            """,
+            (session_id,),
+        )
+        row = cur.fetchone()
+        if not row:
             raise HTTPException(status_code=404, detail="QRIS session not found")
+        entry = dict(row)
         if entry["status"] == "pending":
+            cur.execute(
+                "UPDATE qris_sessions SET status = 'cancelled' WHERE session_id = %s",
+                (session_id,),
+            )
             entry["status"] = "cancelled"
-        return _serialize_session(entry, now_mono)
+    return _serialize_session(entry, now_dt)
 
 
 # --- Minimal ISO-18004 QR Code (Byte mode, ECC Level L, Versions 1..5, up to 106 UTF-8 bytes) ---

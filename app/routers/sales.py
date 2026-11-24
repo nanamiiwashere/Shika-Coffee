@@ -4,13 +4,14 @@ from decimal import Decimal
 import os
 import socket
 from typing import Any, Literal
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from psycopg2.extensions import connection as PgConnection
 
 from app.database import get_raw_db as get_db
 from app.qris import cancel_qris_session, create_qris_session, get_qris_session, pay_qris_session, render_qr_svg
 from app.schemas import OrderStatus, OrderStatusUpdate, PaymentMethod, QrisSessionCreate, SaleCreate
 from app.security import get_current_user, require_role
+from app.uploads import resolve_rows_images
 
 router = APIRouter(prefix="/sales", tags=["POS Sales"])
 
@@ -37,9 +38,13 @@ def _qris_public_base(request: Request) -> str:
 def start_qris_session(
     body: QrisSessionCreate,
     request: Request,
+    response: Response,
     user: dict[str, Any] = Depends(get_current_user),
+    db: PgConnection = Depends(get_db),
 ):
+    response.headers["Cache-Control"] = "no-store"
     session = create_qris_session(
+        db=db,
         amount=body.amount,
         customer_name=body.customer_name,
         user_id=user["id"],
@@ -52,18 +57,26 @@ def start_qris_session(
 
 
 @router.get("/qris/sessions/{session_id}")
-def read_qris_session(session_id: str):
-    return get_qris_session(session_id)
+def read_qris_session(session_id: str, response: Response, db: PgConnection = Depends(get_db)):
+    response.headers["Cache-Control"] = "no-store"
+    return get_qris_session(db, session_id)
 
 
 @router.post("/qris/sessions/{session_id}/pay")
-def confirm_qris_session(session_id: str):
-    return pay_qris_session(session_id)
+def confirm_qris_session(session_id: str, response: Response, db: PgConnection = Depends(get_db)):
+    response.headers["Cache-Control"] = "no-store"
+    return pay_qris_session(db, session_id)
 
 
 @router.post("/qris/sessions/{session_id}/cancel")
-def abort_qris_session(session_id: str, _: dict[str, Any] = Depends(get_current_user)):
-    return cancel_qris_session(session_id)
+def abort_qris_session(
+    session_id: str,
+    response: Response,
+    _: dict[str, Any] = Depends(get_current_user),
+    db: PgConnection = Depends(get_db),
+):
+    response.headers["Cache-Control"] = "no-store"
+    return cancel_qris_session(db, session_id)
 
 
 @router.post("", status_code=201)
@@ -253,7 +266,7 @@ def list_sales(
             (sale_ids,),
         )
         items_by_sale: dict[int, list[dict[str, Any]]] = defaultdict(list)
-        for item in cur.fetchall():
+        for item in resolve_rows_images(cur.fetchall(), "image_url"):
             items_by_sale[item["sale_id"]].append(item)
         return [{**row, "items": items_by_sale[row["id"]]} for row in rows]
 

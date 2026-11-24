@@ -9,6 +9,7 @@ from psycopg2.extensions import connection as PgConnection
 from app.database import get_raw_db as get_db
 from app.schemas import ShiftNoteCreate, ShiftNoteUpdate
 from app.security import get_current_user, require_role
+from app.uploads import resolve_rows_images
 
 router = APIRouter(
     prefix="/reports",
@@ -141,7 +142,7 @@ def top_products(
             """,
             params,
         )
-        return cur.fetchall()
+        return resolve_rows_images(cur.fetchall(), "image_url")
 
 
 @router.get("/cogs")

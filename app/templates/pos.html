@@ -114,7 +114,7 @@
                   <span class="pos-product-quantity" x-show="cartQty(p.id) > 0" x-text="cartQty(p.id)"
                     :aria-label="cartQty(p.id) + ' in order'"></span>
                   <div class="pos-product-image"><img :src="productImage(p)" :alt="p.name" width="220" height="220"
-                      loading="lazy" @error.once="$el.src = '/static/images/product-placeholder.svg'"></div>
+                      loading="lazy" @error.once="$el.src = '{{ img_url('product-placeholder.svg') }}'"></div>
                   <div class="pos-product-bottom">
                     <div class="pos-product-copy">
                       <h2 x-text="p.name"></h2>
@@ -164,7 +164,7 @@
                 <template x-for="(item, idx) in cart" :key="item.product_id">
                   <li class="pos-cart-item">
                     <div class="pos-cart-thumbnail"><img :src="productImage(item)" :alt="item.name" width="52"
-                        height="60" @error.once="$el.src = '/static/images/product-placeholder.svg'"></div>
+                        height="60" @error.once="$el.src = '{{ img_url('product-placeholder.svg') }}'"></div>
                     <div class="pos-cart-item-content">
                       <div class="pos-cart-item-top">
                         <h4 x-text="item.name"></h4><span x-text="formatMoney(item.price * item.quantity)"></span>

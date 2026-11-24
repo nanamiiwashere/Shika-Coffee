@@ -585,9 +585,11 @@ function shikaWorkspaceShell() {
     },
 
     productImage(p) {
+      const base = (typeof window !== 'undefined' && window.SHIKA_IMG_BASE) || '/static/images';
       const url = typeof p?.image_url === 'string' ? p.image_url.trim() : '';
+      if (url.startsWith('/static/images/')) return `${base}/${url.slice('/static/images/'.length)}`;
       if (url.startsWith('/') || /^https?:\/\//i.test(url)) return url;
-      return '/static/images/product-placeholder.svg';
+      return `${base}/product-placeholder.svg`;
     },
 
     _clearSession() {

@@ -11,7 +11,7 @@
   <header class="landing-header landing-shell" data-landing-header>
     <a class="landing-brand" href="#top" aria-label="Shika Coffee home">
       <span class="landing-logo-window">
-        <img src="{{ url_for('static', path='images/shika-logo.png') }}" alt="Shika Coffee" width="417" height="565" fetchpriority="high">
+        <img src="{{ img_url('shika-logo.png') }}" alt="Shika Coffee" width="417" height="565" fetchpriority="high">
       </span>
     </a>
     <button class="landing-nav-toggle" type="button" aria-controls="landing-navigation" aria-expanded="false" data-landing-nav-toggle hidden>
@@ -40,10 +40,10 @@
           </div>
         </div>
         <div class="landing-hero-art" data-landing-reveal="right" style="--landing-reveal-delay: 120ms" role="img" aria-label="Shika’s smiling deer mascot holding a cup of coffee, surrounded by a lime-green shape and forest-green waves.">
-          <img class="landing-hero-blob" src="{{ url_for('static', path='images/blob.png') }}" alt="" width="1080" height="1350">
-          <span class="landing-ribbon landing-ribbon-top"><img src="{{ url_for('static', path='images/wave.png') }}" alt="" width="1080" height="1350"></span>
-          <img class="landing-hero-mascot" src="{{ url_for('static', path='images/mascot.png') }}" alt="" width="508" height="635" fetchpriority="high">
-          <span class="landing-ribbon landing-ribbon-bottom"><img src="{{ url_for('static', path='images/wave.png') }}" alt="" width="1080" height="1350"></span>
+          <img class="landing-hero-blob" src="{{ img_url('blob.png') }}" alt="" width="1080" height="1350">
+          <span class="landing-ribbon landing-ribbon-top"><img src="{{ img_url('wave.png') }}" alt="" width="1080" height="1350"></span>
+          <img class="landing-hero-mascot" src="{{ img_url('mascot.png') }}" alt="" width="508" height="635" fetchpriority="high">
+          <span class="landing-ribbon landing-ribbon-bottom"><img src="{{ img_url('wave.png') }}" alt="" width="1080" height="1350"></span>
         </div>
       </div>
     </section>
