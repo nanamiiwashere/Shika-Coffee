@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
+
+_UNSUPPORTED_LIBPQ_PARAMS = frozenset({"pgbouncer", "connection_limit", "pool_timeout", "schema", "supa"})
 
 
 def load_dotenv_if_present() -> None:
@@ -16,7 +18,7 @@ def load_dotenv_if_present() -> None:
 
 
 def normalize_database_url(raw_url: str) -> str:
-    url = raw_url.strip()
+    url = raw_url.strip().strip('"').strip("'")
     if not url:
         return url
     if url.startswith("postgres://"):
@@ -31,6 +33,10 @@ def normalize_database_url(raw_url: str) -> str:
                 user, pw = userinfo.split(":", 1)
                 if any(ch in pw for ch in "@:/?#[] "):
                     url = f"{scheme}://{user}:{quote(pw, safe='')}@{hostpart}"
+    parts = urlsplit(url)
+    if parts.query:
+        filtered = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k.lower() not in _UNSUPPORTED_LIBPQ_PARAMS]
+        url = urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(filtered), parts.fragment))
     return url
 
 
@@ -38,7 +44,7 @@ load_dotenv_if_present()
 
 DATABASE_URL = normalize_database_url(os.environ["DATABASE_URL"])
 DIRECT_URL = normalize_database_url(os.getenv("DIRECT_URL", ""))
-JWT_SECRET = os.environ["JWT_SECRET"]
+JWT_SECRET = os.environ["JWT_SECRET"].strip().strip('"').strip("'")
 IS_VERCEL = bool(os.getenv("VERCEL"))
 
 CORS_ORIGINS = [

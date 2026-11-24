@@ -43,6 +43,7 @@ def get_raw_db() -> Generator:
         driver_conn.cursor_factory = RealDictCursor
         yield driver_conn
     finally:
-        driver_conn.cursor_factory = None
-        driver_conn.rollback()
+        if not driver_conn.closed:
+            driver_conn.cursor_factory = None
+            driver_conn.rollback()
         raw_conn.close()

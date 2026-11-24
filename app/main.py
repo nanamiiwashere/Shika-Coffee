@@ -21,7 +21,8 @@ app.add_middleware(
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-app.mount("/static", StaticFiles(directory=BASE_DIR / "app" / "static"), name="static")
+STATIC_DIR = BASE_DIR / "app" / "static"
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR), check_dir=False), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 
 
