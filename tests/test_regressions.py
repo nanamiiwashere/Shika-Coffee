@@ -898,6 +898,7 @@ def test_supabase_and_vercel_configuration(monkeypatch):
 
     vercel_cfg = json.loads((REPO_ROOT / "vercel.json").read_text(encoding="utf-8"))
     assert "rewrites" not in vercel_cfg
+    assert vercel_cfg["regions"] == ["sin1"]
     assert vercel_cfg["functions"]["app/main.py"]["includeFiles"] == "app/**"
     assert not (REPO_ROOT / "api").exists()
     pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
