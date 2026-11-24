@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import quote
 
 
 def load_dotenv_if_present() -> None:
@@ -16,10 +17,20 @@ def load_dotenv_if_present() -> None:
 
 def normalize_database_url(raw_url: str) -> str:
     url = raw_url.strip()
+    if not url:
+        return url
     if url.startswith("postgres://"):
-        return "postgresql+psycopg2://" + url[len("postgres://") :]
-    if url.startswith("postgresql://"):
-        return "postgresql+psycopg2://" + url[len("postgresql://") :]
+        url = "postgresql+psycopg2://" + url[len("postgres://") :]
+    elif url.startswith("postgresql://"):
+        url = "postgresql+psycopg2://" + url[len("postgresql://") :]
+    if "://" in url:
+        scheme, rest = url.split("://", 1)
+        if "@" in rest:
+            userinfo, hostpart = rest.rsplit("@", 1)
+            if ":" in userinfo:
+                user, pw = userinfo.split(":", 1)
+                if any(ch in pw for ch in "@:/?#[] "):
+                    url = f"{scheme}://{user}:{quote(pw, safe='')}@{hostpart}"
     return url
 
 
