@@ -900,7 +900,9 @@ def test_supabase_and_vercel_configuration(monkeypatch):
     assert vercel_app is app
     vercel_cfg = json.loads((REPO_ROOT / "vercel.json").read_text(encoding="utf-8"))
     assert vercel_cfg["rewrites"][0]["destination"] == "/api/index"
-    assert vercel_cfg["functions"]["api/index.py"]["includeFiles"] == "app/{templates,static}/**"
+    assert vercel_cfg["functions"]["api/index.py"]["includeFiles"] == "app/**"
+    pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert '"fastapi"' in pyproject and "package = false" in pyproject
 
     assert normalize_database_url("postgres://u:p@host:6543/postgres") == "postgresql+psycopg2://u:p@host:6543/postgres"
     assert normalize_database_url("postgresql://u:p@host:6543/postgres") == "postgresql+psycopg2://u:p@host:6543/postgres"
