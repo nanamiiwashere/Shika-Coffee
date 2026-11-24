@@ -893,14 +893,13 @@ def test_supabase_and_vercel_configuration(monkeypatch):
     import json
     from types import SimpleNamespace
     import httpx
-    from api.index import app as vercel_app
     from app.config import normalize_database_url
     from app.uploads import is_allowed_image_url, remove_local_upload, save_local_image
 
-    assert vercel_app is app
     vercel_cfg = json.loads((REPO_ROOT / "vercel.json").read_text(encoding="utf-8"))
-    assert vercel_cfg["rewrites"][0]["destination"] == "/api/index"
-    assert vercel_cfg["functions"]["api/index.py"]["includeFiles"] == "app/**"
+    assert "rewrites" not in vercel_cfg
+    assert vercel_cfg["functions"]["app/main.py"]["includeFiles"] == "app/**"
+    assert not (REPO_ROOT / "api").exists()
     pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert '"fastapi"' in pyproject and "package = false" in pyproject
 
@@ -942,6 +941,56 @@ def test_supabase_and_vercel_configuration(monkeypatch):
 
     remove_local_upload(uploaded, "products")
     assert calls[1][0] == "DELETE"
+
+
+def test_vercel_cold_start_diagnostics_without_crashing():
+    import json
+    import os
+    import subprocess
+    import sys
+
+    # 1. Under VERCEL=1 with missing DATABASE_URL / JWT_SECRET, import succeeds & /health reports 503 misconfigured
+    clean_env = {k: v for k, v in os.environ.items() if k not in {"DATABASE_URL", "DIRECT_URL", "JWT_SECRET"}}
+    clean_env["VERCEL"] = "1"
+    clean_env["VERCEL_PROJECT_PRODUCTION_URL"] = "americano.ai.id"
+    probe_code = (
+        "import json; from fastapi.testclient import TestClient; from app.main import app; "
+        "from app.config import CORS_ORIGINS; "
+        "c = TestClient(app); h = c.get('/health'); r = c.get('/'); "
+        "print(json.dumps({'health_status': h.status_code, 'health': h.json(), 'root_status': r.status_code, 'cors': CORS_ORIGINS}))"
+    )
+    proc = subprocess.run(
+        [sys.executable, "-c", probe_code],
+        cwd=str(REPO_ROOT),
+        env=clean_env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    out = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert out["health_status"] == 503
+    assert out["health"]["status"] == "misconfigured"
+    assert set(out["health"]["missing_env_vars"]) == {"DATABASE_URL", "JWT_SECRET"}
+    assert out["health"]["templates_present"] is True
+    assert out["root_status"] == 200
+    assert "https://americano.ai.id" in out["cors"]
+
+    # 2. Under VERCEL=1 with malformed DATABASE_URL, import succeeds & /health reports redacted db_error
+    bad_env = dict(clean_env)
+    bad_env["DATABASE_URL"] = "badscheme://u:topsecret@host/db"
+    bad_env["JWT_SECRET"] = "test-secret"
+    proc_bad = subprocess.run(
+        [sys.executable, "-c", probe_code],
+        cwd=str(REPO_ROOT),
+        env=bad_env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    out_bad = json.loads(proc_bad.stdout.strip().splitlines()[-1])
+    assert out_bad["health_status"] == 503
+    assert out_bad["health"]["missing_env_vars"] == []
+    assert out_bad["health"]["db_error"] and "topsecret" not in out_bad["health"]["db_error"]
 
 
 def test_migrate_existing_images_to_supabase_bucket(seeded_db, monkeypatch):
