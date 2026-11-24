@@ -993,6 +993,23 @@ def test_vercel_cold_start_diagnostics_without_crashing():
     assert out_bad["health"]["db_error"] and "topsecret" not in out_bad["health"]["db_error"]
 
 
+def test_authenticated_route_uses_single_db_connection(seeded_db, manager_headers, monkeypatch):
+    from app import database
+
+    checkouts = 0
+    orig_raw_connection = database.engine.raw_connection
+
+    def counting_raw_connection():
+        nonlocal checkouts
+        checkouts += 1
+        return orig_raw_connection()
+
+    monkeypatch.setattr(database.engine, "raw_connection", counting_raw_connection)
+    res = client.get("/reports/dashboard", headers=manager_headers)
+    assert res.status_code == 200
+    assert checkouts == 1
+
+
 def test_migrate_existing_images_to_supabase_bucket(seeded_db, monkeypatch):
     from types import SimpleNamespace
     import httpx
