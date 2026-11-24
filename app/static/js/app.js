@@ -72,6 +72,19 @@ function shikaHomeForRole(role) {
   return ['admin', 'manager'].includes(role) ? '/dashboard' : '/pos';
 }
 
+function shikaJwtRoleHint(token) {
+  try {
+    const parts = String(token || '').split('.');
+    if (parts.length < 2) return '';
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = b64.length % 4 ? '='.repeat(4 - (b64.length % 4)) : '';
+    const payload = JSON.parse(atob(b64 + pad));
+    return typeof payload?.role === 'string' ? payload.role : '';
+  } catch {
+    return '';
+  }
+}
+
 function shikaAuth(initialMode = 'login') {
   return {
     authMode: initialMode === 'register' ? 'register' : 'login',
@@ -95,7 +108,7 @@ function shikaAuth(initialMode = 'login') {
           this.loading = true;
           try {
             const res = await shikaAuthRequest('/auth/oauth/session', { method: 'POST' });
-            await this.completeSignIn(res.access_token);
+            await this.completeSignIn(res.access_token, res.role);
             return;
           } catch (err) {
             this.authError = err.message || 'Social sign-in expired. Please try again.';
@@ -121,11 +134,16 @@ function shikaAuth(initialMode = 'login') {
       }
     },
 
-    async completeSignIn(accessToken) {
+    async completeSignIn(accessToken, roleHint = '') {
       if (typeof accessToken !== 'string' || !accessToken.trim()) {
         throw new Error('The sign-in response was invalid. Please try again.');
       }
       localStorage.setItem('shika_token', accessToken);
+      const role = roleHint || shikaJwtRoleHint(accessToken);
+      if (role) {
+        window.location.replace(shikaHomeForRole(role));
+        return;
+      }
       let dest = '/pos';
       try {
         const me = await window.shikaFetch('/auth/me', { token: accessToken });
@@ -145,7 +163,7 @@ function shikaAuth(initialMode = 'login') {
           body: JSON.stringify({ identifier: this.loginForm.identifier.trim(), password: this.loginForm.password }),
         });
         this.loginForm.password = '';
-        await this.completeSignIn(res.access_token);
+        await this.completeSignIn(res.access_token, res.role);
       } catch (err) {
         this.authError = err.message || 'We couldn’t sign you in. Please try again.';
       } finally {
@@ -648,6 +666,11 @@ function shikaPos() {
           }
           this.token = res.access_token;
           localStorage.setItem('shika_token', this.token);
+          const oauthRole = res.role || shikaJwtRoleHint(this.token);
+          if (['admin', 'manager'].includes(oauthRole)) {
+            window.location.replace('/dashboard');
+            return;
+          }
           if (await this.bootstrapSession()) {
             if (this.isManager()) {
               window.location.replace('/dashboard');
@@ -698,9 +721,15 @@ function shikaPos() {
 
     async bootstrapSession() {
       try {
-        this.user = await this.api('/auth/me');
-        await Promise.all([this.loadCategories(), this.loadProducts(), this.loadSales(), this.loadStock()]);
+        const [me] = await Promise.all([
+          this.api('/auth/me'),
+          this.loadCategories(),
+          this.loadProducts(),
+          this.loadSales(),
+          this.loadStock(),
+        ]);
         if (!this.token) return false;
+        this.user = me;
         this.selectedCategory = this.displayCategories[0]?.id ?? null;
         this.applyFilters();
         return true;
@@ -1135,8 +1164,14 @@ function shikaOrders() {
       }
       this.stageMap = this._loadStageMap();
       try {
-        this.user = await this.api('/auth/me');
-        await Promise.all([this.loadCatalogLookups(), this.loadOrders(), this.loadStock()]);
+        const [me] = await Promise.all([
+          this.api('/auth/me'),
+          this.loadCatalogLookups(),
+          this.loadOrders(),
+          this.loadStock(),
+        ]);
+        if (!this.token) return;
+        this.user = me;
         // ponytail: 15s polling; upgrade to SSE/WebSocket if sub-second kitchen sync across stations is needed.
         this._pollTimer = setInterval(() => {
           if (this.token && !document.hidden && !this.ordersLoading && !this.cancellingOrder) {
@@ -1576,18 +1611,37 @@ function shikaReports() {
         }
       }
 
-      await this._initStaffSession(async () => {
-        if (!this.isManager()) {
-          this.accessDenied = true;
-          this.initialLoading = false;
-          return;
-        }
-        try {
+      if (!this.token) {
+        window.location.replace('/login');
+        return;
+      }
+      const roleHint = shikaJwtRoleHint(this.token);
+      try {
+        if (['admin', 'manager'].includes(roleHint)) {
+          const [meRes, ovRes] = await Promise.allSettled([this.api('/auth/me'), this.loadOverview()]);
+          if (!this.token) return;
+          if (meRes.status === 'rejected') throw meRes.reason;
+          this.user = meRes.value;
+          if (!this.isManager()) {
+            this.accessDenied = true;
+            return;
+          }
+          if (ovRes.status === 'rejected') throw ovRes.reason;
+          await this.loadDashboardBackgroundTabs();
+        } else {
+          this.user = await this.api('/auth/me');
+          if (!this.token) return;
+          if (!this.isManager()) {
+            this.accessDenied = true;
+            return;
+          }
           await this.loadDashboardAll();
-        } finally {
-          this.initialLoading = false;
         }
-      });
+      } catch (err) {
+        if (this.token) this.notify(err.message || 'Could not refresh dashboard data.', 'error');
+      } finally {
+        this.initialLoading = false;
+      }
     },
 
     _readJsonStore(key) {
@@ -1714,16 +1768,20 @@ function shikaReports() {
       return this.liveQueueOrders().length;
     },
 
+    async loadDashboardBackgroundTabs() {
+      await Promise.all([this.loadSalesHistory(), this.loadCatalogData()]);
+      if (!this.token) return;
+      const tail = [this.loadRoasteryData(), this.loadPurchases()];
+      if (this.isAdmin()) tail.push(this.loadUsers());
+      await Promise.all(tail);
+    },
+
     async loadDashboardAll() {
       this.busy = true;
       try {
         await this.loadOverview();
         if (!this.token) return;
-        await Promise.all([this.loadSalesHistory(), this.loadCatalogData()]);
-        if (!this.token) return;
-        const tail = [this.loadRoasteryData(), this.loadPurchases()];
-        if (this.isAdmin()) tail.push(this.loadUsers());
-        await Promise.all(tail);
+        await this.loadDashboardBackgroundTabs();
       } catch (err) {
         if (this.token) this.notify(err.message || 'Could not refresh dashboard data.', 'error');
       } finally {
