@@ -62,6 +62,8 @@ def test_html_pages_render_ok():
     assert "Back to " not in orders_html
     app_js = (REPO_ROOT / "app" / "static" / "js" / "app.js").read_text(encoding="utf-8")
     assert "shika_bar_stages" in app_js
+    assert "shikaResolveOrderStage" in app_js
+    assert "/order-status" in app_js
     for stage_label in ("Queued", "Brewing", "Ready", "Start Brew", "Mark Ready", "Complete"):
         assert stage_label in app_js
 
