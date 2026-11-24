@@ -3,7 +3,7 @@ uvicorn
 jinja2
 sqlalchemy
 psycopg2-binary
-pwdlib
+pwdlib[argon2]
 argon2-cffi
 PyJWT
 pydantic[email]
