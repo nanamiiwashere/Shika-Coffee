@@ -8,12 +8,11 @@ import httpx
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from psycopg2.extensions import connection as PgConnection
 from pwdlib import PasswordHash
-from sqlalchemy.orm import Session
 
 from app.config import JWT_SECRET
-from app.database import get_db
-from app.models import User
+from app.database import get_raw_db
 
 JWT_ALG = "HS256"
 PASSWORD_HASHER = PasswordHash.recommended()
@@ -54,21 +53,31 @@ def verify_password(plain: str, hashed: str) -> bool:
     return PASSWORD_HASHER.verify(plain, hashed)
 
 
+def _jwt_secret() -> str:
+    if not JWT_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Server auth not configured (missing JWT_SECRET)",
+        )
+    return JWT_SECRET
+
+
 def create_access_token(user_id: int, role: str) -> str:
     payload = {
         "sub": str(user_id),
         "role": role,
         "exp": datetime.now(timezone.utc) + timedelta(hours=12),
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
+    return jwt.encode(payload, _jwt_secret(), algorithm=JWT_ALG)
 
 
 def get_current_user(
     creds: HTTPAuthorizationCredentials = Depends(BEARER),
-    db: Session = Depends(get_db),
+    db: PgConnection = Depends(get_raw_db),
 ) -> dict[str, Any]:
+    secret = _jwt_secret()
     try:
-        payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALG])
+        payload = jwt.decode(creds.credentials, secret, algorithms=[JWT_ALG])
         # State and handoff JWTs share the signing key, but are never access tokens.
         if payload.get("purpose") is not None:
             raise ValueError("Not an access token")
@@ -76,18 +85,30 @@ def get_current_user(
     except (jwt.PyJWTError, KeyError, ValueError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user or not user.is_active:
+    with db.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, email, username, full_name, avatar_url, role, is_active
+            FROM users
+            WHERE id = %s
+            """,
+            (user_id,),
+        )
+        user = cur.fetchone()
+    # End the read-only lookup transaction so the shared connection enters route handlers cleanly.
+    db.rollback()
+
+    if not user or not user["is_active"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account inactive or not found")
 
     return {
-        "id": user.id,
-        "email": user.email,
-        "username": user.username,
-        "full_name": user.full_name,
-        "avatar_url": user.avatar_url,
-        "role": user.role,
-        "is_active": user.is_active,
+        "id": user["id"],
+        "email": user["email"],
+        "username": user["username"],
+        "full_name": user["full_name"],
+        "avatar_url": user["avatar_url"],
+        "role": user["role"],
+        "is_active": user["is_active"],
     }
 
 
@@ -108,11 +129,13 @@ def create_oauth_state(provider: str, *, flow: str = "api") -> str:
         "nonce": secrets.token_urlsafe(16),
         "exp": datetime.now(timezone.utc) + timedelta(seconds=OAUTH_STATE_TTL),
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
+    return jwt.encode(payload, _jwt_secret(), algorithm=JWT_ALG)
 
 
 def oauth_state_is_browser(provider: str, state: str) -> bool:
     """Recognize even expired browser states for feedback only, never authorization."""
+    if not JWT_SECRET:
+        return False
     try:
         payload = jwt.decode(state, JWT_SECRET, algorithms=[JWT_ALG], options={"verify_exp": False})
     except jwt.PyJWTError:
@@ -125,9 +148,10 @@ def oauth_state_is_browser(provider: str, state: str) -> bool:
 
 
 def verify_oauth_state(provider: str, state: str, *, browser_cookie: str | None = None) -> dict[str, Any]:
+    secret = _jwt_secret()
     try:
         payload = jwt.decode(
-            state, JWT_SECRET, algorithms=[JWT_ALG],
+            state, secret, algorithms=[JWT_ALG],
             options={"require": ["exp", "purpose", "provider", "nonce"]},
         )
     except jwt.PyJWTError:
@@ -151,13 +175,14 @@ def create_oauth_handoff(user_id: int) -> str:
         "nonce": secrets.token_urlsafe(16),
         "exp": datetime.now(timezone.utc) + timedelta(seconds=OAUTH_HANDOFF_TTL),
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
+    return jwt.encode(payload, _jwt_secret(), algorithm=JWT_ALG)
 
 
 def verify_oauth_handoff(token: str) -> int:
+    secret = _jwt_secret()
     try:
         payload = jwt.decode(
-            token, JWT_SECRET, algorithms=[JWT_ALG],
+            token, secret, algorithms=[JWT_ALG],
             options={"require": ["exp", "sub", "purpose", "nonce"]},
         )
         if payload["purpose"] != "oauth_handoff":
