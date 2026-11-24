@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="640" viewBox="0 0 800 640" role="img" aria-labelledby="title desc">
+  <title id="title">Shika Coffee beverages category illustration</title>
+  <desc id="desc">A stylized tea glass with citrus and leaves in forest green, cream, and lime. Category artwork, not a product photograph.</desc>
+  <defs>
+    <pattern id="paper" width="32" height="32" patternUnits="userSpaceOnUse">
+      <circle cx="3" cy="3" r="1" fill="#105332" opacity=".06"/>
+    </pattern>
+    <clipPath id="glass"><path d="M296 202h208l-22 282a22 22 0 0 1-22 20H340a22 22 0 0 1-22-20z"/></clipPath>
+  </defs>
+  <path fill="#faf7ef" d="M0 0h800v640H0z"/>
+  <path fill="url(#paper)" d="M0 0h800v640H0z"/>
+  <circle cx="400" cy="314" r="218" fill="#e9eddc"/>
+  <circle cx="583" cy="179" r="43" fill="#cce36b"/>
+  <path d="M184 402c-37-47-31-92 11-123 20 54 14 94-11 123Z" fill="#105332" opacity=".8"/>
+  <path d="M199 423c6-49 36-76 86-74-11 44-39 68-86 74Z" fill="#105332"/>
+  <ellipse cx="400" cy="513" rx="164" ry="18" fill="#105332" opacity=".1"/>
+  <path d="m442 142-29 175" stroke="#105332" stroke-width="13" stroke-linecap="round"/>
+  <path d="M296 202h208l-22 282a22 22 0 0 1-22 20H340a22 22 0 0 1-22-20z" fill="#faf7ef"/>
+  <g clip-path="url(#glass)">
+    <path d="M296 292q52-18 104 0t104 0v212H296Z" fill="#cce36b"/>
+    <path d="M296 348q52-18 104 0t104 0v156H296Z" fill="#105332" opacity=".14"/>
+    <g fill="#faf7ef" stroke="#105332" stroke-opacity=".15" stroke-width="3">
+      <rect x="333" y="259" width="55" height="53" rx="10" transform="rotate(-12 360 285)"/>
+      <rect x="411" y="303" width="52" height="50" rx="10" transform="rotate(13 437 328)"/>
+    </g>
+    <path d="m335 358 9 110" stroke="#faf7ef" stroke-width="9" stroke-linecap="round" opacity=".7"/>
+  </g>
+  <path d="M296 202h208l-22 282a22 22 0 0 1-22 20H340a22 22 0 0 1-22-20z" fill="none" stroke="#105332" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M292 202h216" stroke="#105332" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="507" cy="248" r="50" fill="#cce36b" stroke="#105332" stroke-width="6"/>
+  <circle cx="507" cy="248" r="37" fill="#faf7ef" stroke="#105332" stroke-width="3"/>
+  <path d="M507 211v74m-37-37h74m-63-26 52 52m0-52-52 52" stroke="#105332" stroke-width="3"/>
+  <path d="M550 370c38-45 71-40 95-11-39 21-69 24-95 11Z" fill="#105332"/>
+  <path d="M550 370c-5-50 19-75 57-75-7 41-25 65-57 75Z" fill="#cce36b" stroke="#105332" stroke-width="3"/>
+  <text x="400" y="577" text-anchor="middle" fill="#105332" font-family="Georgia,serif" font-size="27" letter-spacing="5">BEVERAGES</text>
+  <text x="400" y="605" text-anchor="middle" fill="#686b60" font-family="Arial,sans-serif" font-size="12" letter-spacing="3">SHIKA COFFEE · CATEGORY ILLUSTRATION</text>
+</svg>
