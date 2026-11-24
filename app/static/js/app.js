@@ -1121,6 +1121,27 @@ function shikaQrisPayPage(sessionId) {
 
 const SHIKA_BAR_STAGES_KEY = 'shika_bar_stages';
 const SHIKA_BAR_STAGE_ORDER = ['queued', 'brewing', 'ready', 'served'];
+const SHIKA_DB_TO_STAGE = { received: 'queued', processing: 'brewing', ready: 'ready', finished: 'served' };
+const SHIKA_STAGE_TO_DB = { queued: 'received', brewing: 'processing', ready: 'ready', served: 'finished' };
+
+function shikaLocalDateOf(iso) {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function shikaResolveOrderStage(order, localMap, todayStr) {
+  if (!order) return 'queued';
+  if (order.status === 'cancelled') return 'cancelled';
+  const orderDay = shikaLocalDateOf(order.transaction_date);
+  if (todayStr && orderDay && orderDay < todayStr) return 'served';
+  const dbStage = SHIKA_DB_TO_STAGE[order.order_status];
+  if (dbStage && dbStage !== 'queued') return dbStage;
+  const localStage = localMap?.[order.id];
+  if (SHIKA_BAR_STAGE_ORDER.includes(localStage)) return localStage;
+  return 'queued';
+}
+
 const SHIKA_KDS_COLUMNS = [
   { id: 'queued', label: 'Queued', subtitle: 'Waiting', icon: 'clock', nextStage: 'brewing', ctaLabel: 'Start Brew', ctaStyle: 'is-surface', emptyText: 'No orders waiting' },
   { id: 'brewing', label: 'Brewing', subtitle: 'On bar', icon: 'flame', nextStage: 'ready', ctaLabel: 'Mark Ready', ctaStyle: 'is-surface', emptyText: 'Nothing brewing on the bar' },
@@ -1207,21 +1228,16 @@ function shikaOrders() {
       this.ordersError = '';
       try {
         if (this.categories.length === 0) await this.loadCatalogLookups();
+        const rows = await this.api('/sales?include_items=true');
+        if (!this.token) return;
+        const hydrated = (Array.isArray(rows) ? rows : []).map(row => ({ ...row, items: row.items || [] }));
         const today = this.localDateStr(0);
-        const rows = await this.api(`/sales?date_from=${encodeURIComponent(today)}&date_to=${encodeURIComponent(today)}&${this.tzOffsetParam()}`);
-        if (!this.token) return;
-        const list = Array.isArray(rows) ? rows : [];
-        const hydrated = await Promise.all(
-          list.map(row => this.api(`/sales/${row.id}`).catch(() => ({ ...row, items: row.items || [] }))),
-        );
-        if (!this.token) return;
-
         const nextStages = { ...this._loadStageMap() };
         let changed = false;
         for (const order of hydrated) {
-          const cur = nextStages[order.id];
-          if (!SHIKA_BAR_STAGE_ORDER.includes(cur)) {
-            nextStages[order.id] = 'queued';
+          const resolved = shikaResolveOrderStage(order, nextStages, today);
+          if (resolved !== 'cancelled' && nextStages[order.id] !== resolved) {
+            nextStages[order.id] = resolved;
             changed = true;
           }
         }
@@ -1257,10 +1273,7 @@ function shikaOrders() {
     },
 
     orderStage(order) {
-      if (!order) return 'queued';
-      if (order.status === 'cancelled') return 'cancelled';
-      const st = this.stageMap[order.id];
-      return SHIKA_BAR_STAGE_ORDER.includes(st) ? st : 'queued';
+      return shikaResolveOrderStage(order, this.stageMap, this.localDateStr(0));
     },
 
     stageLabel(stageId) {
@@ -1309,11 +1322,19 @@ function shikaOrders() {
       if (this.leavingOrderIds[order.id]) return;
 
       const commit = () => {
+        const dbStatus = SHIKA_STAGE_TO_DB[stage];
+        if (dbStatus) order.order_status = dbStatus;
         const next = { ...this.stageMap, [order.id]: stage };
         this.stageMap = next;
         this._saveStageMap(next);
         this._markCardEntering(order.id, stage);
         this.notify(`${this.ticketChannel(order)} ${this.shortInvoice(order.invoice_number)} moved to ${this.stageLabel(stage)}.`);
+        if (dbStatus && order.status !== 'cancelled') {
+          this.api(`/sales/${order.id}/order-status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ order_status: dbStatus }),
+          }).catch(() => {});
+        }
       };
 
       const reducedMotion = typeof window !== 'undefined'
@@ -1628,8 +1649,8 @@ function shikaReports() {
             this.accessDenied = true;
             return;
           }
-          if (ovRes.status === 'rejected') throw ovRes.reason;
           await this.loadDashboardBackgroundTabs();
+          if (ovRes.status === 'rejected') throw ovRes.reason;
         } else {
           this.user = await this.api('/auth/me');
           if (!this.token) return;
@@ -1771,11 +1792,11 @@ function shikaReports() {
     },
 
     async loadDashboardBackgroundTabs() {
-      await Promise.all([this.loadSalesHistory(), this.loadCatalogData()]);
+      await Promise.allSettled([this.loadSalesHistory(), this.loadCatalogData()]);
       if (!this.token) return;
       const tail = [this.loadRoasteryData(), this.loadPurchases()];
       if (this.isAdmin()) tail.push(this.loadUsers());
-      await Promise.all(tail);
+      await Promise.allSettled(tail);
     },
 
     async loadDashboardAll() {
@@ -1980,10 +2001,7 @@ function shikaReports() {
 
     // Live Bar Queue helpers shared with /pos/orders stage map
     orderStage(order) {
-      if (!order) return 'queued';
-      if (order.status === 'cancelled') return 'cancelled';
-      const st = this.queueStageMap[order.id];
-      return SHIKA_BAR_STAGE_ORDER.includes(st) ? st : 'queued';
+      return shikaResolveOrderStage(order, this.queueStageMap, this.localDateStr(0));
     },
 
     stageLabel(stageId) {
@@ -2005,10 +2023,18 @@ function shikaReports() {
       const nextMap = { queued: 'brewing', brewing: 'ready', ready: 'served' };
       const next = nextMap[cur];
       if (!next) return;
+      const dbStatus = SHIKA_STAGE_TO_DB[next];
+      if (dbStatus) order.order_status = dbStatus;
       const updated = { ...this.queueStageMap, [order.id]: next };
       this.queueStageMap = updated;
       this._writeJsonStore(SHIKA_BAR_STAGES_KEY, updated);
       this.notify(`${this.shortInvoice(order.invoice_number)} moved to ${this.stageLabel(next)}.`);
+      if (dbStatus && order.status !== 'cancelled') {
+        this.api(`/sales/${order.id}/order-status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ order_status: dbStatus }),
+        }).catch(() => {});
+      }
     },
 
     ticketChannel(order) {
@@ -2053,7 +2079,7 @@ function shikaReports() {
 
     // Sales & Voids
     async loadSalesHistory() {
-      const rows = await this.api(`/sales?date_from=${encodeURIComponent(this.revFrom)}&date_to=${encodeURIComponent(this.revTo)}&${this.tzOffsetParam()}&include_items=true`);
+      const rows = await this.api('/sales?include_items=true');
       if (this.token) this.sales = Array.isArray(rows) ? rows : [];
     },
 

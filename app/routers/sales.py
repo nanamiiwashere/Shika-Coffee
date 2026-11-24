@@ -236,7 +236,7 @@ def list_sales(
         params.append(payment_method)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     # ponytail: capped at 1000 rows for bounded analytics queries; switch to SQL bucket aggregation if daily volume exceeds 1000 tickets.
-    row_limit = 1000 if (date_from or date_to) else 200
+    row_limit = 1000 if (date_from or date_to) else 500
     with db.cursor() as cur:
         cur.execute(
             f"""
