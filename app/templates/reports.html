@@ -1,0 +1,1817 @@
+{% extends "base.html" %}
+{% from "_adm_sidebar.html" import adm_svg_defs, adm_sidebar, adm_profile_modal, adm_receipt_modal, adm_print_popup %}
+{% block title %}Shika Coffee: Back Office{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', path='css/admin-theme.css') }}?v=20261123n">{% endblock %}
+{% block content %}
+<div
+  class="adm-app"
+  x-data="shikaReports()"
+  @keydown.escape.window="closeAllOverlays()"
+>
+  {{ adm_svg_defs() }}
+
+  <div x-show="toast.show" x-cloak x-transition:enter="adm-toast-enter" x-transition:enter-start="adm-toast-enter-start" x-transition:enter-end="adm-toast-enter-end" x-transition:leave="adm-toast-leave" x-transition:leave-start="adm-toast-leave-start" x-transition:leave-end="adm-toast-leave-end" class="adm-toast no-print" :class="{ 'is-error': toast.type === 'error' }" role="status" aria-live="polite">
+    <span x-text="toast.message"></span>
+    <button type="button" @click="toast.show = false" aria-label="Dismiss notification">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-close"></use></svg>
+    </button>
+  </div>
+
+  <div x-show="token" x-cloak class="adm-shell">
+    {{ adm_sidebar('dashboard') }}
+
+    <div class="adm-content-col">
+      <header class="adm-topbar">
+        <div class="adm-topbar-left">
+          <button type="button" class="adm-mobile-menu" @click="sidebarOpen = !sidebarOpen" :aria-expanded="sidebarOpen" aria-label="Toggle navigation sidebar">
+            <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-menu"></use></svg>
+          </button>
+          <div class="adm-breadcrumb">
+            <span>Shika Roastery</span>
+            <span aria-hidden="true">/</span>
+            <strong x-text="pageTitle()"></strong>
+            <span aria-hidden="true">·</span>
+            <time class="adm-mono" style="font-size:12px; color:var(--muted-text);" x-text="todayMonoDate"></time>
+          </div>
+        </div>
+
+        <div class="adm-topbar-right">
+          <button type="button" class="adm-btn" @click="loadDashboardAll()" :disabled="busy">
+            <svg class="adm-icon" :class="{ 'adm-spin': busy }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-refresh"></use></svg>
+            <span x-text="busy ? 'Refreshing...' : 'Refresh'"></span>
+          </button>
+        </div>
+      </header>
+
+      <main class="adm-main">
+        <h1 class="adm-sr-only" x-text="'Back Office: ' + pageTitle()"></h1>
+
+        <div class="adm-gate" x-show="accessDenied" x-cloak role="alert">
+          <div>
+            <strong>Manager or Admin role is required for Back Office analytics.</strong>
+            <p style="font-size:12px; margin-top:2px;">Your cashier account can use POS System and Bar Orders.</p>
+          </div>
+          <div class="adm-actions">
+            <a href="/pos" class="adm-btn is-primary">Open POS System</a>
+            <a href="/pos/orders" class="adm-btn">Bar Orders</a>
+          </div>
+        </div>
+
+        <div class="adm-card" x-show="!accessDenied && initialLoading" role="status">
+          <p class="adm-empty">Loading live store data from PostgreSQL...</p>
+        </div>
+
+        <template x-if="!accessDenied">
+          <div class="adm-stack">
+            <!-- PAGE 1: OVERVIEW -->
+            <section x-show="activeTab === 'overview'" x-transition:enter="adm-tab-enter" x-transition:enter-start="adm-tab-enter-start" x-transition:enter-end="adm-tab-enter-end" class="adm-stack" aria-label="Overview">
+              <div class="adm-kpi-grid">
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Today's Revenue</span>
+                  <strong class="adm-kpi-value" x-text="formatMoney(dashboard.today_revenue || 0)"></strong>
+                  <span class="adm-kpi-caption" x-text="(dashboard.today_transactions || 0) + ' completed tickets today'"></span>
+                </article>
+
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Active Brew Queue</span>
+                  <strong class="adm-kpi-value" x-text="liveQueueOrders().length"></strong>
+                  <span class="adm-kpi-caption" x-text="todaySales.length + ' total orders today'"></span>
+                </article>
+
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Average Ticket</span>
+                  <strong class="adm-kpi-value" x-text="formatMoney(avgTicketToday())"></strong>
+                  <span class="adm-kpi-caption">Completed orders today</span>
+                </article>
+
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Roastery Bean Stock</span>
+                  <strong class="adm-kpi-value" x-text="roasteryTotalWeightLabel()"></strong>
+                  <span class="adm-kpi-caption" :class="{ 'is-warning': lowStockRows.length > 0 }" x-text="lowStockRows.length > 0 ? (lowStockRows.length + ' items below par') : 'All tracked lots optimal'"></span>
+                </article>
+              </div>
+
+              <div class="adm-row-overview">
+                <div class="adm-card">
+                  <div class="adm-chart-header">
+                    <div>
+                      <h2 style="font-size:14px; font-weight:600;">Sales Revenue</h2>
+                      <p style="font-size:12px; color:var(--muted-text); margin-top:2px;">
+                        <span class="adm-mono" style="font-weight:600; color:var(--text);" x-text="chartMetric === 'revenue' ? formatMoney(chartSeriesTotal()) : (chartSeriesTotal() + ' cups')"></span>
+                        <span> · </span>
+                        <span x-text="chartRange === 'today' ? 'Hourly counter pace' : (chartRange === '7d' ? 'Last 7 days pace' : 'Last 30 days pace')"></span>
+                      </p>
+                    </div>
+                    <div class="adm-chart-controls">
+                      <div class="adm-seg" role="group" aria-label="Chart metric">
+                        <button type="button" class="adm-seg-btn" :class="{ 'is-active': chartMetric === 'revenue' }" @click="chartMetric = 'revenue'">Revenue</button>
+                        <button type="button" class="adm-seg-btn" :class="{ 'is-active': chartMetric === 'cups' }" @click="chartMetric = 'cups'">Cups</button>
+                      </div>
+                      <div class="adm-seg" role="group" aria-label="Chart date range">
+                        <button type="button" class="adm-seg-btn" :class="{ 'is-active': chartRange === 'today' }" @click="setChartRange('today')">Today</button>
+                        <button type="button" class="adm-seg-btn" :class="{ 'is-active': chartRange === '7d' }" @click="setChartRange('7d')">7D</button>
+                        <button type="button" class="adm-seg-btn" :class="{ 'is-active': chartRange === '30d' }" @click="setChartRange('30d')">30D</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p class="adm-chart-hint" x-text="hoveredChartBar() ? (hoveredChartBar().label + ': ' + formatMoney(hoveredChartBar().revenue) + ' (' + hoveredChartBar().cups + ' cups)') : 'Hover any bar for exact counter totals'"></p>
+
+                  <div class="adm-bar-chart" @mouseleave="hoveredBarIdx = null">
+                    <div class="adm-bar-yaxis" aria-hidden="true">
+                      <template x-for="(tick, tIdx) in chartYAxisTicks()" :key="'yt-' + tIdx">
+                        <span x-text="tick"></span>
+                      </template>
+                    </div>
+                    <div class="adm-bar-plot">
+                      <div class="adm-bar-tooltip" x-show="hoveredChartBar()" x-transition:enter="adm-tip-enter" x-transition:enter-start="adm-tip-enter-start" x-transition:enter-end="adm-tip-enter-end" x-transition:leave="adm-tip-leave" x-transition:leave-start="adm-tip-leave-start" x-transition:leave-end="adm-tip-leave-end" x-text="hoveredChartBar() ? (hoveredChartBar().label + ' · ' + (chartMetric === 'revenue' ? formatMoney(hoveredChartBar().revenue) : hoveredChartBar().cups + ' cups')) : ''"></div>
+                      <template x-for="(bar, idx) in chartBars()" :key="bar.key">
+                        <button
+                          type="button"
+                          class="adm-bar-col"
+                          :class="{ 'is-active': activeChartBarIdx() === idx }"
+                          @mouseenter="hoveredBarIdx = idx"
+                          @focus="hoveredBarIdx = idx"
+                          @click="hoveredBarIdx = idx"
+                          :aria-label="bar.label + ': ' + formatMoney(bar.revenue) + ', ' + bar.cups + ' cups'"
+                        >
+                          <span class="adm-bar-fill" :class="{ 'is-zero': bar.pct === 0 }" :style="'height:' + bar.pct + '%'"></span>
+                          <span class="adm-bar-label" x-text="bar.label"></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="adm-card">
+                  <div class="adm-card-head">
+                    <div>
+                      <h2>Live Bar Queue</h2>
+                      <p>Advance drinks from station to pickup counter</p>
+                    </div>
+                    <a href="/pos/orders" class="adm-link-btn">All &rarr;</a>
+                  </div>
+
+                  <div class="adm-queue-list" x-show="liveQueueOrders().length > 0">
+                    <template x-for="order in liveQueueOrders().slice(0, 6)" :key="'q-' + order.id">
+                      <div class="adm-queue-row">
+                        <div class="adm-queue-copy">
+                          <div class="adm-queue-top">
+                            <strong class="adm-mono" x-text="shortInvoice(order.invoice_number)"></strong>
+                            <strong x-text="ticketGuest(order)"></strong>
+                            <span style="color:var(--muted-text);" x-text="ticketChannel(order)"></span>
+                          </div>
+                          <p class="adm-queue-items" x-text="itemSummaryLine(order) || 'No line items'"></p>
+                          <div class="adm-queue-meta">
+                            <span class="adm-status" :class="{ 'is-warning': orderStage(order) === 'brewing', 'is-success': orderStage(order) === 'ready' }">
+                              <svg class="adm-icon" style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                <use :href="orderStage(order) === 'ready' ? '#adm-i-check' : (orderStage(order) === 'brewing' ? '#adm-i-flame' : '#adm-i-clock')"></use>
+                              </svg>
+                              <span x-text="stageLabel(orderStage(order))"></span>
+                            </span>
+                            <span class="adm-mono" x-text="formatOrderTime(order.transaction_date)"></span>
+                          </div>
+                        </div>
+                        <button type="button" class="adm-btn" @click="advanceQueueOrder(order)" x-text="queueNextLabel(orderStage(order))"></button>
+                      </div>
+                    </template>
+                  </div>
+                  <p class="adm-empty" x-show="liveQueueOrders().length === 0">No active tickets in the bar queue right now.</p>
+                </div>
+              </div>
+
+              <div class="adm-grid-2">
+                <div class="adm-card">
+                  <div class="adm-card-head">
+                    <div>
+                      <h2>Top Drinks &amp; Snacks Today</h2>
+                      <p>Ranked by completed sales volume</p>
+                    </div>
+                    <button type="button" class="adm-link-btn" @click="selectTab('menu')">Menu &rarr;</button>
+                  </div>
+                  <div class="adm-rank-list" x-show="topProducts.length > 0">
+                    <template x-for="(item, idx) in topProducts.slice(0, 6)" :key="'tp-' + item.sku">
+                      <div class="adm-rank-row">
+                        <div class="adm-rank-left">
+                          <span class="adm-rank-num" x-text="'#' + (idx + 1)"></span>
+                          <div style="min-width:0;">
+                            <strong class="adm-cell-main" x-text="item.product_name"></strong>
+                            <span class="adm-cell-sub" x-text="item.category_name"></span>
+                          </div>
+                        </div>
+                        <div style="text-align:right; flex-shrink:0;">
+                          <strong class="adm-mono" x-text="formatMoney(item.total_sales_volume)"></strong>
+                          <span class="adm-cell-sub adm-mono" x-text="item.units_sold + ' sold'"></span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                  <p class="adm-empty" x-show="topProducts.length === 0">No product sales recorded in this period.</p>
+                </div>
+
+                <div class="adm-card">
+                  <div class="adm-card-head">
+                    <div>
+                      <h2>Roastery Stock Watchlist</h2>
+                      <p>Tracked stock lots at or below par threshold</p>
+                    </div>
+                    <button type="button" class="adm-link-btn" @click="selectTab('roastery')">Inventory &rarr;</button>
+                  </div>
+                  <div class="adm-rank-list" x-show="lowStockRows.length > 0">
+                    <template x-for="rm in lowStockRows.slice(0, 6)" :key="'wl-' + rm.id">
+                      <div class="adm-rank-row">
+                        <div style="min-width:0;">
+                          <strong class="adm-cell-main" x-text="rm.name"></strong>
+                          <span class="adm-cell-sub adm-mono" x-text="rm.sku + ' · Par ' + rm.minimum_stock + ' ' + rm.unit_symbol"></span>
+                        </div>
+                        <div style="text-align:right; flex-shrink:0;">
+                          <strong class="adm-mono" style="color:var(--warning);" x-text="rm.current_stock + ' ' + rm.unit_symbol"></strong>
+                          <span class="adm-cell-sub adm-mono" x-text="'Deficit ' + rm.reorder_deficit + ' ' + rm.unit_symbol"></span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                  <p class="adm-empty" x-show="lowStockRows.length === 0">All materials are currently above par threshold.</p>
+                </div>
+              </div>
+
+              <div class="adm-card" id="shift-notes">
+                <div class="adm-notes-head">
+                  <div>
+                    <div class="adm-notes-title-row">
+                      <h2>Shift Notes</h2>
+                    </div>
+                    <p>Daily bean flavor profiles, dial-in ratios, and bar maintenance reminders</p>
+                  </div>
+                  <div class="adm-seg" role="tablist" aria-label="Filter shift notes by category">
+                    <button type="button" role="tab" class="adm-seg-btn" :class="{ 'is-active': shiftNotesFilter === 'all' }" :aria-selected="shiftNotesFilter === 'all'" @click="shiftNotesFilter = 'all'">
+                      <span>All</span>
+                      <span class="adm-mono" style="margin-left:4px; color:var(--muted-text);" x-text="shiftNotes.length"></span>
+                    </button>
+                    <button type="button" role="tab" class="adm-seg-btn" :class="{ 'is-active': shiftNotesFilter === 'flavor' }" :aria-selected="shiftNotesFilter === 'flavor'" @click="shiftNotesFilter = 'flavor'">
+                      <span>Flavor</span>
+                      <span class="adm-mono" style="margin-left:4px; color:var(--muted-text);" x-text="shiftNotesByCategory('flavor').length"></span>
+                    </button>
+                    <button type="button" role="tab" class="adm-seg-btn" :class="{ 'is-active': shiftNotesFilter === 'maintenance' }" :aria-selected="shiftNotesFilter === 'maintenance'" @click="shiftNotesFilter = 'maintenance'">
+                      <span>Maintenance</span>
+                      <span class="adm-mono" style="margin-left:4px; color:var(--muted-text);" x-text="shiftNotesByCategory('maintenance').length"></span>
+                    </button>
+                    <button type="button" role="tab" class="adm-seg-btn" :class="{ 'is-active': shiftNotesFilter === 'service' }" :aria-selected="shiftNotesFilter === 'service'" @click="shiftNotesFilter = 'service'">
+                      <span>Service</span>
+                      <span class="adm-mono" style="margin-left:4px; color:var(--muted-text);" x-text="shiftNotesByCategory('service').length"></span>
+                    </button>
+                  </div>
+                </div>
+
+                <form class="adm-notes-form" @submit.prevent="addShiftNote()">
+                  <label class="adm-sr-only" for="shift-note-cat">Note category</label>
+                  <select id="shift-note-cat" class="adm-select" x-model="shiftNoteForm.category">
+                    <option value="flavor">Flavor Note</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="service">Service</option>
+                  </select>
+                  <label class="adm-sr-only" for="shift-note-input">Shift note details</label>
+                  <input id="shift-note-input" class="adm-input" type="text" maxlength="240" x-model="shiftNoteForm.text" placeholder="Log bean tasting notes, water temp, or equipment reminder..." autocomplete="off">
+                  <button type="submit" class="adm-btn is-primary" :disabled="shiftNoteSaving || !shiftNoteForm.text.trim()" x-text="shiftNoteSaving ? 'Saving...' : 'Log Note'"></button>
+                </form>
+
+                <div class="adm-notes-list" x-show="filteredShiftNotes().length > 0">
+                  <template x-for="note in filteredShiftNotes()" :key="note.id">
+                    <article class="adm-note-row">
+                      <div class="adm-note-copy">
+                        <div class="adm-note-meta">
+                          <span class="adm-note-cat" :class="'is-' + note.category">
+                            <svg class="adm-icon" style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                              <use :href="note.category === 'maintenance' ? '#adm-i-wrench' : (note.category === 'service' ? '#adm-i-clipboard' : '#adm-i-cup')"></use>
+                            </svg>
+                            <span x-text="shiftNoteCategoryLabel(note.category)"></span>
+                          </span>
+                          <span aria-hidden="true">·</span>
+                          <time class="adm-mono" x-text="formatOrderTime(note.created_at) || note.time || ''"></time>
+                          <span aria-hidden="true">·</span>
+                          <span x-text="formatShortAuthor(note.author_name)"></span>
+                        </div>
+                        <p class="adm-note-body" :class="{ 'is-done': note.is_done }" x-text="note.content"></p>
+                      </div>
+                      <div class="adm-note-actions">
+                        <button type="button" class="adm-note-done-btn" :class="{ 'is-done': note.is_done }" :aria-pressed="note.is_done" @click="toggleShiftNoteDone(note)">
+                          <svg class="adm-icon" style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><use href="#adm-i-check-plain"></use></svg>
+                          <span>Done</span>
+                        </button>
+                        <button type="button" class="adm-note-del-btn" @click="deleteShiftNote(note.id)" :aria-label="'Delete note: ' + note.content" title="Delete note">
+                          <svg class="adm-icon" style="width:15px;height:15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><use href="#adm-i-trash"></use></svg>
+                        </button>
+                      </div>
+                    </article>
+                  </template>
+                </div>
+                <p class="adm-empty" x-show="filteredShiftNotes().length === 0">No shift notes logged in this category yet.</p>
+              </div>
+            </section>
+
+            <!-- PAGE 2: SALES & VOIDS -->
+            <section x-show="activeTab === 'sales'" x-cloak x-transition:enter="adm-tab-enter" x-transition:enter-start="adm-tab-enter-start" x-transition:enter-end="adm-tab-enter-end" class="adm-stack" aria-label="Sales and Void History">
+              <div class="adm-kpi-grid">
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Net Completed Sales</span>
+                  <strong class="adm-kpi-value" x-text="formatMoney(netCompletedSales())"></strong>
+                  <span class="adm-kpi-caption adm-mono" x-text="'Gross before voids: ' + formatMoney(grossBeforeVoids())"></span>
+                </article>
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Completed Tickets</span>
+                  <strong class="adm-kpi-value" x-text="completedTicketsCount()"></strong>
+                  <span class="adm-kpi-caption">Settled across counter &amp; takeaway</span>
+                </article>
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Voided Tickets</span>
+                  <strong class="adm-kpi-value" x-text="voidedTicketsCount()"></strong>
+                  <span class="adm-kpi-caption adm-mono" x-text="'Void rate ' + voidRatePct() + '%'"></span>
+                </article>
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Voided Value</span>
+                  <strong class="adm-kpi-value is-danger" x-text="formatMoney(voidedValueTotal())"></strong>
+                  <span class="adm-kpi-caption">Audited cancellations &amp; stock restores</span>
+                </article>
+              </div>
+
+              <div class="adm-strip">
+                <span style="font-size:12px; color:var(--muted-text); font-weight:500;">Tender Breakdown (Completed Sales)</span>
+                <div class="adm-strip-stats">
+                  <span><span style="color:var(--muted-text);">QRIS / QR</span> <strong class="adm-mono" x-text="formatMoney(tenderSummary().qris.amount)"></strong> <span class="adm-mono" style="color:var(--muted-text);" x-text="'(' + tenderSummary().qris.count + ')'"></span></span>
+                  <span><span style="color:var(--muted-text);">Cash</span> <strong class="adm-mono" x-text="formatMoney(tenderSummary().cash.amount)"></strong> <span class="adm-mono" style="color:var(--muted-text);" x-text="'(' + tenderSummary().cash.count + ')'"></span></span>
+                  <span><span style="color:var(--muted-text);">Debit / Card</span> <strong class="adm-mono" x-text="formatMoney(tenderSummary().debit.amount)"></strong> <span class="adm-mono" style="color:var(--muted-text);" x-text="'(' + tenderSummary().debit.count + ')'"></span></span>
+                </div>
+              </div>
+
+              <div class="adm-filter-bar">
+                <div class="adm-seg" role="tablist" aria-label="Filter sales records">
+                  <button type="button" role="tab" class="adm-seg-btn" :class="{ 'is-active': salesStatusTab === 'all' }" :aria-selected="salesStatusTab === 'all'" @click="salesStatusTab = 'all'">
+                    <span>All Records</span>
+                    <span class="adm-mono" style="font-size:11px; color:var(--muted-text);" x-text="sales.length"></span>
+                  </button>
+                  <button type="button" role="tab" class="adm-seg-btn" :class="{ 'is-active': salesStatusTab === 'completed' }" :aria-selected="salesStatusTab === 'completed'" @click="salesStatusTab = 'completed'">
+                    <span>Completed Sales</span>
+                    <span class="adm-mono" style="font-size:11px; color:var(--muted-text);" x-text="completedTicketsCount()"></span>
+                  </button>
+                  <button type="button" role="tab" class="adm-seg-btn" :class="{ 'is-active': salesStatusTab === 'cancelled' }" :aria-selected="salesStatusTab === 'cancelled'" @click="salesStatusTab = 'cancelled'">
+                    <span>Voided</span>
+                    <span class="adm-mono" style="font-size:11px; color:var(--muted-text);" x-text="voidedTicketsCount()"></span>
+                  </button>
+                </div>
+
+                <div class="adm-filter-right">
+                  <label class="adm-sr-only" for="sales-tender-filter">Filter by tender</label>
+                  <select id="sales-tender-filter" class="adm-select" x-model="salesTenderFilter">
+                    <option value="">All Tenders</option>
+                    <option value="qris">QRIS / QR</option>
+                    <option value="cash">Cash</option>
+                    <option value="debit">Debit / Card</option>
+                  </select>
+                  <label class="adm-search" for="sales-search">
+                    <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-search"></use></svg>
+                    <input id="sales-search" type="search" x-model="salesSearch" placeholder="Search ticket #, guest, void reason..." autocomplete="off">
+                  </label>
+                </div>
+              </div>
+
+              <div class="adm-split" :class="{ 'has-detail': inspectedSale !== null }">
+                <div class="adm-card is-flush">
+                  <div class="adm-table-wrap">
+                    <table class="adm-table">
+                      <thead>
+                        <tr>
+                          <th>Ticket</th>
+                          <th>Guest &amp; Tender</th>
+                          <th>Items</th>
+                          <th>Status / Audit</th>
+                          <th class="is-num">Amount</th>
+                          <th class="is-num">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="sale in filteredSales()" :key="'sv-' + sale.id">
+                          <tr :class="{ 'is-selected': inspectedSaleId === sale.id }">
+                            <td>
+                              <strong class="adm-cell-main adm-mono" x-text="shortInvoice(sale.invoice_number)"></strong>
+                              <span class="adm-cell-sub adm-mono" x-text="formatDateTime(sale.transaction_date)"></span>
+                            </td>
+                            <td>
+                              <strong class="adm-cell-main" x-text="ticketGuest(sale)"></strong>
+                              <span class="adm-cell-sub" x-text="ticketChannel(sale) + ' · ' + paymentLabel(sale.payment_method)"></span>
+                            </td>
+                            <td style="max-width:260px;">
+                              <span style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" x-text="itemSummaryLine(sale) || 'No items'"></span>
+                            </td>
+                            <td>
+                              <span class="adm-status" x-show="sale.status !== 'cancelled'">
+                                <svg class="adm-icon" style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-check"></use></svg>
+                                <span>Served</span>
+                              </span>
+                              <div x-show="sale.status === 'cancelled'">
+                                <span class="adm-status is-danger">
+                                  <svg class="adm-icon" style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-xcircle"></use></svg>
+                                  <span>Cancelled</span>
+                                </span>
+                                <span class="adm-cell-danger" x-text="saleVoidReason(sale.id)"></span>
+                              </div>
+                            </td>
+                            <td class="is-num">
+                              <strong :class="{ 'adm-strike': sale.status === 'cancelled' }" x-text="formatMoney(sale.total_amount)"></strong>
+                            </td>
+                            <td class="is-num">
+                              <div class="adm-actions">
+                                <button type="button" class="adm-btn is-ghost" x-show="sale.status !== 'cancelled'" @click="openVoidModal(sale)">Void</button>
+                                <button type="button" class="adm-btn" :class="{ 'is-primary': inspectedSaleId === sale.id }" @click="inspectSale(sale)" x-text="inspectedSaleId === sale.id ? 'Selected' : 'Inspect'"></button>
+                              </div>
+                            </td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                    <p class="adm-empty" x-show="filteredSales().length === 0">No sales records match your current filters.</p>
+                  </div>
+                </div>
+
+                <aside class="adm-inspect-panel" x-show="inspectedSale" x-cloak x-transition:enter="adm-panel-enter" x-transition:enter-start="adm-panel-enter-start" x-transition:enter-end="adm-panel-enter-end" x-transition:leave="adm-panel-leave" x-transition:leave-start="adm-panel-leave-start" x-transition:leave-end="adm-panel-leave-end" aria-label="Ticket inspection panel">
+                  <template x-if="inspectedSale">
+                    <div>
+                      <div class="adm-inspect-head">
+                        <div>
+                          <div style="display:flex; align-items:center; gap:8px;">
+                            <strong class="adm-mono" x-text="shortInvoice(inspectedSale.invoice_number)"></strong>
+                            <span class="adm-status" :class="{ 'is-danger': inspectedSale.status === 'cancelled' }">
+                              <svg class="adm-icon" style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use :href="inspectedSale.status === 'cancelled' ? '#adm-i-xcircle' : '#adm-i-check'"></use></svg>
+                              <span x-text="inspectedSale.status === 'cancelled' ? 'Cancelled' : 'Served'"></span>
+                            </span>
+                          </div>
+                          <p class="adm-cell-sub adm-mono" style="margin-top:4px;" x-text="formatOrderTime(inspectedSale.transaction_date) + ' · ' + ticketChannel(inspectedSale) + ' · ' + paymentLabel(inspectedSale.payment_method)"></p>
+                        </div>
+                        <button type="button" class="adm-btn is-ghost is-icon" @click="closeInspect()" aria-label="Close detail panel">
+                          <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-close"></use></svg>
+                        </button>
+                      </div>
+
+                      <div class="adm-inspect-body">
+                        <div style="display:flex; justify-content:space-between; gap:12px;">
+                          <div>
+                            <span class="adm-cell-sub">Guest</span>
+                            <strong class="adm-cell-main" x-text="ticketGuest(inspectedSale)"></strong>
+                          </div>
+                          <div style="text-align:right;">
+                            <span class="adm-cell-sub">Cashier</span>
+                            <strong class="adm-cell-main" style="font-size:12px;" x-text="inspectedSale.cashier_name || 'Staff'"></strong>
+                          </div>
+                        </div>
+
+                        <div x-show="inspectedSale.status === 'cancelled'" style="padding:8px 10px; border:1px solid var(--danger); border-radius:var(--radius-ctrl); background:var(--danger-soft); color:var(--danger); font-size:12px;">
+                          <strong>Audit Reason:</strong> <span x-text="saleVoidReason(inspectedSale.id)"></span>
+                        </div>
+
+                        <ul class="adm-inspect-items">
+                          <template x-for="it in inspectedSale.items || []" :key="'ins-' + it.id">
+                            <li class="adm-inspect-item">
+                              <div style="min-width:0;">
+                                <strong style="display:block; font-size:13px;" x-text="it.product_name"></strong>
+                                <span class="adm-cell-sub adm-mono" x-text="it.quantity + ' × ' + formatMoney(it.unit_price) + ' · ' + itemCategoryName(it)"></span>
+                              </div>
+                              <strong class="adm-mono" style="font-size:12px;" x-text="formatMoney(it.subtotal)"></strong>
+                            </li>
+                          </template>
+                        </ul>
+
+                        <div class="adm-inspect-total">
+                          <span>Settled Total</span>
+                          <span class="adm-mono" :class="{ 'adm-strike': inspectedSale.status === 'cancelled' }" x-text="formatMoney(inspectedSale.total_amount)"></span>
+                        </div>
+                      </div>
+
+                      <div class="adm-inspect-footer">
+                        <button type="button" class="adm-btn is-full is-danger-outline" x-show="inspectedSale.status !== 'cancelled'" @click="openVoidModal(inspectedSale)">
+                          <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-xcircle"></use></svg>
+                          <span>Void Ticket &amp; Record Reason</span>
+                        </button>
+                        <button type="button" class="adm-btn is-full" @click="openReceipt(inspectedSale.id)">
+                          <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-print"></use></svg>
+                          <span>Print Receipt</span>
+                        </button>
+                      </div>
+                    </div>
+                  </template>
+                </aside>
+              </div>
+            </section>
+
+            <!-- PAGE 3: MENU & RECIPES -->
+            <section x-show="activeTab === 'menu'" x-cloak x-transition:enter="adm-tab-enter" x-transition:enter-start="adm-tab-enter-start" x-transition:enter-end="adm-tab-enter-end" class="adm-stack" aria-label="Menu and Recipes">
+              <div class="adm-filter-bar" style="border-bottom:1px solid var(--border); padding-bottom:10px;">
+                <div class="adm-menu-tabs" role="tablist" aria-label="Menu category filter">
+                  <button type="button" role="tab" class="adm-tab-link" :class="{ 'is-active': productCategoryFilter === '' }" :aria-selected="productCategoryFilter === ''" @click="productCategoryFilter = ''; ensureSelectedProduct()">
+                    <span>All</span>
+                    <span class="adm-mono" style="font-size:11px; color:var(--muted-text);" x-text="products.length"></span>
+                  </button>
+                  <template x-for="c in categories" :key="'mc-' + c.id">
+                    <button type="button" role="tab" class="adm-tab-link" :class="{ 'is-active': productCategoryFilter === String(c.id) }" :aria-selected="productCategoryFilter === String(c.id)" @click="productCategoryFilter = String(c.id); ensureSelectedProduct()">
+                      <span x-text="c.name"></span>
+                      <span class="adm-mono" style="font-size:11px; color:var(--muted-text);" x-text="categoryProductCount(c.id)"></span>
+                    </button>
+                  </template>
+                </div>
+
+                <div class="adm-filter-right">
+                  <label class="adm-search" for="menu-search">
+                    <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-search"></use></svg>
+                    <input id="menu-search" type="search" x-model="productSearch" @input="ensureSelectedProduct()" placeholder="Search item, SKU..." autocomplete="off">
+                  </label>
+                  <button type="button" class="adm-btn" @click="categoryModalOpen = true">Categories</button>
+                  <button type="button" class="adm-btn is-primary" @click="openNewProductModal()">+ New Item</button>
+                </div>
+              </div>
+
+              <div class="adm-master-detail">
+                <div class="adm-menu-list" aria-label="Menu items list">
+                  <template x-for="p in filteredProducts" :key="'mp-' + p.id">
+                    <button type="button" class="adm-menu-row" :class="{ 'is-selected': selectedProductId === p.id }" @click="selectProduct(p)">
+                      <div class="adm-menu-thumb">
+                        <img :src="productImage(p)" :alt="p.name" width="44" height="44" loading="lazy" @error.once="$el.src = '/static/images/product-placeholder.svg'">
+                      </div>
+                      <div class="adm-menu-row-copy">
+                        <div class="adm-menu-row-top">
+                          <strong x-text="p.name"></strong>
+                          <span class="adm-mono" style="font-size:12px; font-weight:600;" x-text="formatMoney(p.price)"></span>
+                        </div>
+                        <div class="adm-menu-row-top" style="margin-top:2px;">
+                          <span class="adm-cell-sub" x-text="p.category_name + ' · ' + p.sku"></span>
+                          <span class="adm-cell-sub" x-text="p.is_active ? 'Active' : 'Hidden'"></span>
+                        </div>
+                      </div>
+                    </button>
+                  </template>
+                  <p class="adm-empty" x-show="filteredProducts.length === 0">No menu items match this filter.</p>
+                </div>
+
+                <div class="adm-card" x-show="selectedProduct">
+                  <template x-if="selectedProduct">
+                    <div>
+                      <div class="adm-detail-hero">
+                        <div class="adm-detail-photo">
+                          <img :src="productImage(selectedProduct)" :alt="selectedProduct.name" width="136" height="102" @error.once="$el.src = '/static/images/product-placeholder.svg'">
+                        </div>
+                        <div style="flex:1; min-width:0;">
+                          <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
+                            <div>
+                              <h2 style="font-size:18px; font-weight:700;" x-text="selectedProduct.name"></h2>
+                              <p class="adm-cell-sub adm-mono" style="margin-top:3px;" x-text="selectedProduct.category_name + ' · ' + selectedProduct.sku"></p>
+                            </div>
+                            <strong class="adm-mono" style="font-size:18px;" x-text="formatMoney(selectedProduct.price)"></strong>
+                          </div>
+
+                          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:16px;">
+                            <button type="button" class="adm-toggle-row" style="width:auto; padding:0;" role="switch" :aria-checked="selectedProduct.is_active" @click="toggleProductActive(selectedProduct)" :disabled="busy">
+                              <span class="adm-switch" :class="{ 'is-on': selectedProduct.is_active }" aria-hidden="true"></span>
+                              <span style="margin-left:8px; color:var(--text);">Available on POS</span>
+                            </button>
+
+                            <div class="adm-actions">
+                              <button type="button" class="adm-btn" @click="openEditProductModal(selectedProduct)">Edit Item</button>
+                              <button type="button" class="adm-btn" :class="{ 'is-primary': editingRecipe }" @click="editingRecipe = !editingRecipe">
+                                <svg class="adm-icon" style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-edit"></use></svg>
+                                <span x-text="editingRecipe ? 'Done Editing' : 'Edit Recipe'"></span>
+                              </button>
+                              <a href="/pos" class="adm-btn is-primary">+ Order</a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <dl class="adm-detail-specs">
+                        <div class="adm-spec-item">
+                          <dt>SKU</dt>
+                          <dd x-text="selectedProduct.sku"></dd>
+                        </div>
+                        <div class="adm-spec-item">
+                          <dt>Est. COGS</dt>
+                          <dd x-text="selectedProductCogs() && hasRecipe(selectedProductCogs()) ? formatMoney(selectedProductCogs().estimated_cogs) : 'Not set'"></dd>
+                        </div>
+                        <div class="adm-spec-item">
+                          <dt>Gross Profit</dt>
+                          <dd x-text="selectedProductCogs() && hasRecipe(selectedProductCogs()) ? formatMoney(selectedProductCogs().gross_profit) : 'Needs recipe'"></dd>
+                        </div>
+                        <div class="adm-spec-item">
+                          <dt>Gross Margin</dt>
+                          <dd x-text="selectedProductCogs() && hasRecipe(selectedProductCogs()) ? ((selectedProductCogs().margin_percentage ?? 0) + '%') : 'Not set'"></dd>
+                        </div>
+                      </dl>
+
+                      <div class="adm-recipe-cols">
+                        <div>
+                          <div class="adm-card-head" style="margin-bottom:8px;">
+                            <h2>Ingredients</h2>
+                            <span class="adm-mono" style="font-size:11px; color:var(--muted-text);" x-text="recipeItems.length + ' BOM items'"></span>
+                          </div>
+
+                          <form x-show="editingRecipe" class="adm-form-grid" style="margin-bottom:12px;" @submit.prevent="addRecipeItem()">
+                            <div class="adm-field">
+                              <label for="rec-mat">Raw Material</label>
+                              <select id="rec-mat" class="adm-select" x-model="recipeAddForm.raw_material_id" required>
+                                <option value="">Select ingredient...</option>
+                                <template x-for="rm in rawMaterials" :key="'rmo-' + rm.id">
+                                  <option :value="String(rm.id)" x-text="rm.name + ' (' + rm.unit_symbol + ')'"></option>
+                                </template>
+                              </select>
+                            </div>
+                            <div class="adm-field">
+                              <label for="rec-qty">Quantity</label>
+                              <input id="rec-qty" class="adm-input" type="number" step="0.01" min="0.01" x-model="recipeAddForm.quantity_required" placeholder="e.g. 18" required>
+                            </div>
+                            <div class="adm-field is-full">
+                              <button type="submit" class="adm-btn is-primary" :disabled="busy">+ Add Ingredient</button>
+                            </div>
+                          </form>
+
+                          <div x-show="recipeItems.length > 0">
+                            <template x-for="ri in recipeItems" :key="'ri-' + ri.raw_material_id">
+                              <div class="adm-ing-row">
+                                <span x-text="ri.material_name"></span>
+                                <div class="adm-actions" x-show="editingRecipe">
+                                  <label class="adm-sr-only" :for="'ri-q-' + ri.raw_material_id">Quantity</label>
+                                  <input :id="'ri-q-' + ri.raw_material_id" class="adm-input adm-mono" type="number" step="0.01" min="0.01" x-model="ri.quantity_required" style="width:76px;">
+                                  <button type="button" class="adm-btn" @click="updateRecipeQty(ri)" :disabled="busy">Save</button>
+                                  <button type="button" class="adm-btn is-danger-outline is-icon" @click="deleteRecipeItem(ri.raw_material_id)" :disabled="busy" aria-label="Remove ingredient">
+                                    <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-trash"></use></svg>
+                                  </button>
+                                </div>
+                                <strong class="adm-mono" x-show="!editingRecipe" x-text="ri.quantity_required + ' ' + ri.unit_symbol"></strong>
+                              </div>
+                            </template>
+                          </div>
+                          <p class="adm-empty" style="padding:16px 0;" x-show="recipeItems.length === 0">No BOM ingredients assigned yet. Click Edit Recipe to link inventory.</p>
+                        </div>
+
+                        <div>
+                          <div class="adm-card-head" style="margin-bottom:8px;">
+                            <h2>Standard Method</h2>
+                            <span class="adm-mono" style="font-size:11px; color:var(--muted-text);" x-text="selectedMethodSteps().length + ' steps'"></span>
+                          </div>
+
+                          <div x-show="!editingRecipe">
+                            <template x-for="(step, sIdx) in selectedMethodSteps()" :key="'st-' + sIdx">
+                              <div class="adm-step-row">
+                                <span class="adm-step-num" x-text="String(sIdx + 1).padStart(2, '0') + '.'"></span>
+                                <span x-text="step"></span>
+                              </div>
+                            </template>
+                            <p class="adm-empty" style="padding:16px 0;" x-show="selectedMethodSteps().length === 0">No standard prep steps saved for this item yet.</p>
+                          </div>
+
+                          <div x-show="editingRecipe" class="adm-field">
+                            <label for="method-steps-input">One step per line</label>
+                            <textarea id="method-steps-input" class="adm-input" style="height:120px; padding:8px 10px; resize:vertical;" x-model="methodStepsDraft" placeholder="Enter one preparation step per line..."></textarea>
+                            <div style="margin-top:8px;">
+                              <button type="button" class="adm-btn is-primary" @click="saveMethodSteps()">Save Method Steps</button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </section>
+
+            <!-- PAGE 4: ROASTERY & BEANS -->
+            <section x-show="activeTab === 'roastery'" x-cloak x-transition:enter="adm-tab-enter" x-transition:enter-start="adm-tab-enter-start" x-transition:enter-end="adm-tab-enter-end" class="adm-stack" aria-label="Roastery and Beans">
+              <div class="adm-kpi-grid is-3">
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Active Single-Origin &amp; Stock Lots</span>
+                  <strong class="adm-kpi-value" x-text="inventoryRows.length + ' lots'"></strong>
+                  <span class="adm-kpi-caption">Tracked live in raw materials ledger</span>
+                </article>
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Total Roasted Reserve</span>
+                  <strong class="adm-kpi-value" x-text="roasteryTotalWeightLabel()"></strong>
+                  <span class="adm-kpi-caption">Dry weight across gram-measured lots</span>
+                </article>
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Roast Alerts</span>
+                  <strong class="adm-kpi-value" x-text="lowStockRows.length"></strong>
+                  <span class="adm-kpi-caption" :class="{ 'is-warning': lowStockRows.length > 0 }" x-text="lowStockRows.length > 0 ? 'Lots at or below par threshold' : 'All lots above par threshold'"></span>
+                </article>
+              </div>
+
+              <div class="adm-card">
+                <div class="adm-card-head">
+                  <div>
+                    <h2>Bean Stock Distribution</h2>
+                    <p>Active reserve grouped by lot or unit · Dashed tick marks par threshold</p>
+                  </div>
+                  <div class="adm-seg" role="group" aria-label="Distribution grouping">
+                    <button type="button" class="adm-seg-btn" :class="{ 'is-active': roasteryGroupMode === 'item' }" @click="roasteryGroupMode = 'item'; roasteryHoveredKey = null">Origin / Lot</button>
+                    <button type="button" class="adm-seg-btn" :class="{ 'is-active': roasteryGroupMode === 'unit' }" @click="roasteryGroupMode = 'unit'; roasteryHoveredKey = null">By Unit</button>
+                  </div>
+                </div>
+
+                <div class="adm-dist-info" x-show="hoveredDistRow()">
+                  <strong x-text="hoveredDistRow()?.label"></strong>
+                  <span> · </span>
+                  <span class="adm-mono" x-text="hoveredDistRow()?.displayQty + ' (' + hoveredDistRow()?.sharePct + '% share)'"></span>
+                  <span> · </span>
+                  <span class="adm-mono" style="color:var(--muted-text);" x-text="'Par ' + hoveredDistRow()?.displayPar"></span>
+                </div>
+
+                <div class="adm-dist-grid" x-show="distributionRows().length > 0">
+                  <div class="adm-donut-wrap">
+                    <div class="adm-donut-host" x-html="roasteryDonutSvg()"></div>
+                    <div class="adm-donut-center" x-show="hoveredDistRow()">
+                      <small x-text="hoveredDistRow()?.label"></small>
+                      <strong x-text="hoveredDistRow()?.displayQty"></strong>
+                      <small class="adm-mono" x-text="hoveredDistRow()?.sharePct + '% share'"></small>
+                    </div>
+                  </div>
+
+                  <div class="adm-hbars">
+                    <template x-for="row in distributionRows()" :key="'hb-' + row.key">
+                      <button
+                        type="button"
+                        class="adm-hbar-row"
+                        :class="{ 'is-active': hoveredDistRow()?.key === row.key }"
+                        @mouseenter="roasteryHoveredKey = row.key"
+                        @focus="roasteryHoveredKey = row.key"
+                        @click="roasteryHoveredKey = row.key"
+                      >
+                        <span class="adm-hbar-name" x-text="row.label"></span>
+                        <span class="adm-hbar-track">
+                          <span class="adm-hbar-fill" :style="'width:' + row.barPct + '%'"></span>
+                          <span class="adm-hbar-par" :class="{ 'is-warning': row.belowPar }" :style="'left:' + row.parPct + '%'" :title="'Par: ' + row.displayPar"></span>
+                        </span>
+                        <span class="adm-hbar-val" x-text="row.displayQty + ' · ' + row.sharePct + '%'"></span>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+                <p class="adm-empty" x-show="distributionRows().length === 0">No inventory stock recorded yet.</p>
+              </div>
+
+              <div class="adm-filter-bar">
+                <label class="adm-search" for="roast-search">
+                  <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-search"></use></svg>
+                  <input id="roast-search" type="search" x-model="roasterySearch" placeholder="Search lot, SKU, unit..." autocomplete="off">
+                </label>
+                <div class="adm-filter-right">
+                  <button type="button" class="adm-btn" @click="unitModalOpen = true">Units</button>
+                  <button type="button" class="adm-btn is-primary" @click="openNewMaterialModal()">+ New Lot</button>
+                </div>
+              </div>
+
+              <div class="adm-card is-flush">
+                <div class="adm-table-wrap">
+                  <table class="adm-table">
+                    <thead>
+                      <tr>
+                        <th>Origin Lot / Material</th>
+                        <th>Unit</th>
+                        <th class="is-num">Latest Cost</th>
+                        <th class="is-num">Remaining</th>
+                        <th class="is-num">Par</th>
+                        <th>Status</th>
+                        <th class="is-num">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="rm in filteredRoasteryRows()" :key="'lot-' + rm.id">
+                        <tr>
+                          <td>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                              <span class="adm-lot-thumb" aria-hidden="true">
+                                <template x-if="rm.image_url">
+                                  <img :src="rm.image_url" alt="" width="36" height="36" loading="lazy" @error="$el.hidden = true">
+                                </template>
+                                <svg x-show="!rm.image_url" class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><use href="#adm-i-box"></use></svg>
+                              </span>
+                              <div style="min-width:0;">
+                                <strong class="adm-cell-main" x-text="rm.name"></strong>
+                                <span class="adm-cell-sub adm-mono" x-text="rm.sku"></span>
+                              </div>
+                            </div>
+                          </td>
+                          <td class="adm-mono" x-text="rm.unit_symbol"></td>
+                          <td class="is-num" x-text="formatMoney(rm.latest_purchase_price)"></td>
+                          <td class="is-num"><strong x-text="formatStockQty(rm.current_stock, rm.unit_symbol)"></strong></td>
+                          <td class="is-num" style="color:var(--muted-text);" x-text="formatStockQty(rm.minimum_stock, rm.unit_symbol)"></td>
+                          <td>
+                            <span class="adm-status" :class="rm.is_low_stock ? 'is-danger' : 'is-success'">
+                              <svg class="adm-icon" style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use :href="rm.is_low_stock ? '#adm-i-alert' : '#adm-i-check'"></use></svg>
+                              <span x-text="rm.is_low_stock ? 'Restock Now' : 'Optimal'"></span>
+                            </span>
+                          </td>
+                          <td class="is-num">
+                            <div class="adm-actions">
+                              <button type="button" class="adm-btn" @click="openEditMaterialModal(rm)">Edit</button>
+                              <button type="button" class="adm-btn" @click="openStockActionModal(rm, 'adjust')">Stock</button>
+                              <button type="button" class="adm-btn" @click="openMutationLedger(rm)">Ledger</button>
+                              <button type="button" class="adm-btn is-primary" @click="openRestockModal(rm)">+ Restock</button>
+                            </div>
+                          </td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                  <p class="adm-empty" x-show="filteredRoasteryRows().length === 0">No lots match your search.</p>
+                </div>
+              </div>
+            </section>
+
+            <!-- PAGE 5: PURCHASING & SUPPLIERS -->
+            <section x-show="activeTab === 'purchasing'" x-cloak x-transition:enter="adm-tab-enter" x-transition:enter-start="adm-tab-enter-start" x-transition:enter-end="adm-tab-enter-end" class="adm-stack" aria-label="Purchasing and Suppliers">
+              <div class="adm-kpi-grid is-3">
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Purchase Orders</span>
+                  <strong class="adm-kpi-value" x-text="purchaseSummary.total_orders ?? purchases.length"></strong>
+                  <span class="adm-kpi-caption">Recorded inbound stock deliveries</span>
+                </article>
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Total Procurement Spend</span>
+                  <strong class="adm-kpi-value" x-text="formatMoney(purchaseSummary.total_spend ?? totalProcurementSpend())"></strong>
+                  <span class="adm-kpi-caption">Cumulative procurement spend in database</span>
+                </article>
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Active Suppliers</span>
+                  <strong class="adm-kpi-value" x-text="purchaseSummary.active_suppliers ?? suppliers.length"></strong>
+                  <span class="adm-kpi-caption">Roasters, dairy, and pantry vendors</span>
+                </article>
+              </div>
+
+              <div class="adm-filter-bar">
+                <div class="adm-seg" role="tablist" aria-label="Purchasing sections">
+                  <button type="button" role="tab" class="adm-seg-btn" :class="{ 'is-active': purchasingSubTab === 'pos' }" :aria-selected="purchasingSubTab === 'pos'" @click="purchasingSubTab = 'pos'">
+                    <span>Purchase Orders</span>
+                    <span class="adm-mono" style="font-size:11px; color:var(--muted-text);" x-text="purchases.length"></span>
+                  </button>
+                  <button type="button" role="tab" class="adm-seg-btn" :class="{ 'is-active': purchasingSubTab === 'suppliers' }" :aria-selected="purchasingSubTab === 'suppliers'" @click="purchasingSubTab = 'suppliers'; inspectedPurchase = null">
+                    <span>Suppliers Directory</span>
+                    <span class="adm-mono" style="font-size:11px; color:var(--muted-text);" x-text="suppliers.length"></span>
+                  </button>
+                </div>
+
+                <div class="adm-filter-right">
+                  <label class="adm-search" for="purch-search">
+                    <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-search"></use></svg>
+                    <input id="purch-search" type="search" x-model="purchasingSearch" :placeholder="purchasingSubTab === 'pos' ? 'Search PO #, supplier, notes...' : 'Search supplier, phone, email...'" autocomplete="off">
+                  </label>
+                  <button type="button" class="adm-btn is-primary" x-show="purchasingSubTab === 'pos'" @click="openNewPurchaseModal()">+ New Purchase Order</button>
+                  <button type="button" class="adm-btn is-primary" x-show="purchasingSubTab === 'suppliers'" @click="openNewSupplierModal()">+ Add Supplier</button>
+                </div>
+              </div>
+
+              <!-- Sub-tab: Purchase Orders -->
+              <div x-show="purchasingSubTab === 'pos'" class="adm-split" :class="{ 'has-detail': inspectedPurchase !== null }">
+                <div class="adm-card is-flush">
+                  <div class="adm-table-wrap">
+                    <table class="adm-table">
+                      <thead>
+                        <tr>
+                          <th>PO Number</th>
+                          <th>Supplier</th>
+                          <th>Recorded By</th>
+                          <th>Notes</th>
+                          <th class="is-num">Total Cost</th>
+                          <th class="is-num">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="po in filteredPurchases()" :key="'po-' + po.id">
+                          <tr :class="{ 'is-selected': inspectedPurchase?.id === po.id }">
+                            <td>
+                              <strong class="adm-cell-main adm-mono" x-text="po.po_number"></strong>
+                              <span class="adm-cell-sub adm-mono" x-text="formatDateTime(po.created_at) || po.purchase_date"></span>
+                            </td>
+                            <td><strong class="adm-cell-main" x-text="po.supplier_name"></strong></td>
+                            <td x-text="po.created_by || 'Manager'"></td>
+                            <td style="max-width:220px;"><span style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted-text);" x-text="po.notes || '-'"></span></td>
+                            <td class="is-num"><strong x-text="formatMoney(po.total_cost)"></strong></td>
+                            <td class="is-num">
+                              <button type="button" class="adm-btn" :class="{ 'is-primary': inspectedPurchase?.id === po.id }" @click="inspectPurchase(po.id)" x-text="inspectedPurchase?.id === po.id ? 'Selected' : 'Inspect'"></button>
+                            </td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                    <p class="adm-empty" x-show="filteredPurchases().length === 0">No purchase orders recorded yet. Click + New Purchase Order to log stock intake.</p>
+                  </div>
+                </div>
+
+                <aside class="adm-inspect-panel" x-show="inspectedPurchase" x-cloak x-transition:enter="adm-panel-enter" x-transition:enter-start="adm-panel-enter-start" x-transition:enter-end="adm-panel-enter-end" x-transition:leave="adm-panel-leave" x-transition:leave-start="adm-panel-leave-start" x-transition:leave-end="adm-panel-leave-end" aria-label="Purchase order details">
+                  <template x-if="inspectedPurchase">
+                    <div>
+                      <div class="adm-inspect-head">
+                        <div>
+                          <strong class="adm-mono" x-text="inspectedPurchase.po_number"></strong>
+                          <p class="adm-cell-sub" style="margin-top:3px;" x-text="inspectedPurchase.supplier_name"></p>
+                        </div>
+                        <button type="button" class="adm-btn is-ghost is-icon" @click="inspectedPurchase = null" aria-label="Close PO panel">
+                          <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-close"></use></svg>
+                        </button>
+                      </div>
+                      <div class="adm-inspect-body">
+                        <div style="display:flex; justify-content:space-between; gap:12px;">
+                          <div>
+                            <span class="adm-cell-sub">Purchase Date</span>
+                            <strong class="adm-cell-main adm-mono" x-text="inspectedPurchase.purchase_date || formatDateTime(inspectedPurchase.created_at)"></strong>
+                          </div>
+                          <div style="text-align:right;">
+                            <span class="adm-cell-sub">Lines</span>
+                            <strong class="adm-cell-main adm-mono" x-text="(inspectedPurchase.items || []).length + ' items'"></strong>
+                          </div>
+                        </div>
+                        <div x-show="inspectedPurchase.notes" style="padding:8px 10px; border:1px solid var(--border); border-radius:var(--radius-ctrl); background:var(--surface-subtle); font-size:12px; color:var(--muted-text);" x-text="inspectedPurchase.notes"></div>
+                        <ul class="adm-inspect-items">
+                          <template x-for="it in inspectedPurchase.items || []" :key="'poi-' + it.id">
+                            <li class="adm-inspect-item">
+                              <div style="min-width:0;">
+                                <strong style="display:block; font-size:13px;" x-text="it.material_name"></strong>
+                                <span class="adm-cell-sub adm-mono" x-text="it.sku + ' · ' + it.quantity + ' × ' + formatMoney(it.unit_price)"></span>
+                              </div>
+                              <strong class="adm-mono" style="font-size:12px;" x-text="formatMoney(it.subtotal)"></strong>
+                            </li>
+                          </template>
+                        </ul>
+                        <div class="adm-inspect-total">
+                          <span>Total PO Cost</span>
+                          <span class="adm-mono" x-text="formatMoney(inspectedPurchase.total_cost)"></span>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </aside>
+              </div>
+
+              <!-- Sub-tab: Suppliers Directory -->
+              <div x-show="purchasingSubTab === 'suppliers'" class="adm-card is-flush">
+                <div class="adm-table-wrap">
+                  <table class="adm-table">
+                    <thead>
+                      <tr>
+                        <th>Supplier</th>
+                        <th>Phone</th>
+                        <th>Email</th>
+                        <th>Address</th>
+                        <th class="is-num">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="sup in filteredSuppliers()" :key="'sup-row-' + sup.id">
+                        <tr>
+                          <td><strong class="adm-cell-main" x-text="sup.name"></strong></td>
+                          <td class="adm-mono" x-text="sup.phone || '-'"></td>
+                          <td x-text="sup.email || '-'"></td>
+                          <td style="max-width:260px;"><span style="color:var(--muted-text);" x-text="sup.address || '-'"></span></td>
+                          <td class="is-num">
+                            <div class="adm-actions">
+                              <button type="button" class="adm-btn" @click="openEditSupplierModal(sup)">Edit</button>
+                              <button type="button" class="adm-btn is-danger-outline" @click="deleteSupplier(sup)" :disabled="busy">Delete</button>
+                            </div>
+                          </td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                  <p class="adm-empty" x-show="filteredSuppliers().length === 0">No suppliers match your search.</p>
+                </div>
+              </div>
+            </section>
+
+            <!-- PAGE 6: REPORTS & ANALYTICS -->
+            <section x-show="activeTab === 'analytics'" x-cloak x-transition:enter="adm-tab-enter" x-transition:enter-start="adm-tab-enter-start" x-transition:enter-end="adm-tab-enter-end" class="adm-stack" aria-label="Reports and Analytics">
+              <div class="adm-filter-bar">
+                <div class="adm-seg" role="group" aria-label="Report date presets">
+                  <button type="button" class="adm-seg-btn" :class="{ 'is-active': analyticsPreset === 'today' }" @click="applyAnalyticsPreset('today')">Today</button>
+                  <button type="button" class="adm-seg-btn" :class="{ 'is-active': analyticsPreset === '7d' }" @click="applyAnalyticsPreset('7d')">7D</button>
+                  <button type="button" class="adm-seg-btn" :class="{ 'is-active': analyticsPreset === '30d' }" @click="applyAnalyticsPreset('30d')">30D</button>
+                  <button type="button" class="adm-seg-btn" :class="{ 'is-active': analyticsPreset === '90d' }" @click="applyAnalyticsPreset('90d')">90D</button>
+                </div>
+
+                <form class="adm-filter-right" @submit.prevent="loadAnalyticsReports()">
+                  <label class="adm-sr-only" for="an-from">From date</label>
+                  <input id="an-from" class="adm-input adm-mono" type="date" x-model="revFrom" @change="analyticsPreset = 'custom'" required>
+                  <span style="color:var(--muted-text); font-size:12px;">to</span>
+                  <label class="adm-sr-only" for="an-to">To date</label>
+                  <input id="an-to" class="adm-input adm-mono" type="date" x-model="revTo" @change="analyticsPreset = 'custom'" required>
+                  <button type="submit" class="adm-btn is-primary" :disabled="busy">Apply</button>
+                  <button type="button" class="adm-btn" @click="exportAnalyticsCsv()">
+                    <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-download"></use></svg>
+                    <span>Export CSV</span>
+                  </button>
+                </form>
+              </div>
+
+              <div class="adm-kpi-grid">
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Net Revenue</span>
+                  <strong class="adm-kpi-value" x-text="formatMoney(analyticsTotals().net)"></strong>
+                  <span class="adm-kpi-caption adm-mono" x-text="analyticsTotals().tickets + ' completed tickets in period'"></span>
+                </article>
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Gross Sales</span>
+                  <strong class="adm-kpi-value" x-text="formatMoney(analyticsTotals().gross)"></strong>
+                  <span class="adm-kpi-caption adm-mono" x-text="'Discounts: ' + formatMoney(analyticsTotals().discounts)"></span>
+                </article>
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Tax Collected</span>
+                  <strong class="adm-kpi-value" x-text="formatMoney(analyticsTotals().tax)"></strong>
+                  <span class="adm-kpi-caption">Completed sales tax total</span>
+                </article>
+                <article class="adm-kpi">
+                  <span class="adm-kpi-label">Avg Gross Margin</span>
+                  <strong class="adm-kpi-value is-success" x-text="averageMarginPct() + '%'"></strong>
+                  <span class="adm-kpi-caption adm-mono" x-text="costedMenuCount() + ' / ' + cogsRows.length + ' active items costed'"></span>
+                </article>
+              </div>
+
+              <div class="adm-grid-2">
+                <div class="adm-card is-flush">
+                  <div class="adm-card-head" style="padding:18px 20px 12px; margin-bottom:0;">
+                    <div>
+                      <h2>Revenue Breakdown by Payment</h2>
+                      <p class="adm-mono" x-text="revFrom + ' to ' + revTo"></p>
+                    </div>
+                  </div>
+                  <div class="adm-table-wrap">
+                    <table class="adm-table">
+                      <thead>
+                        <tr>
+                          <th>Method</th>
+                          <th class="is-num">Tickets</th>
+                          <th class="is-num">Gross</th>
+                          <th class="is-num">Tax</th>
+                          <th class="is-num">Net Revenue</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="r in revenueRows" :key="'rev-' + r.payment_method">
+                          <tr>
+                            <td>
+                              <strong class="adm-cell-main" x-text="paymentLabel(r.payment_method)"></strong>
+                              <span class="adm-share-track"><span class="adm-share-fill" :style="'width:' + revenueSharePct(r.net_revenue) + '%'"></span></span>
+                            </td>
+                            <td class="is-num" x-text="r.total_transactions"></td>
+                            <td class="is-num" x-text="formatMoney(r.gross_sales)"></td>
+                            <td class="is-num" x-text="formatMoney(r.total_tax)"></td>
+                            <td class="is-num">
+                              <strong x-text="formatMoney(r.net_revenue)"></strong>
+                              <span class="adm-cell-sub adm-mono" x-text="revenueSharePct(r.net_revenue) + '%'"></span>
+                            </td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                    <p class="adm-empty" x-show="revenueRows.length === 0">No completed revenue in this date range.</p>
+                  </div>
+                </div>
+
+                <div class="adm-card">
+                  <div class="adm-card-head">
+                    <div>
+                      <h2>Top Products in Period</h2>
+                      <p>Best-selling drinks &amp; snacks by units sold</p>
+                    </div>
+                    <span class="adm-mono" style="font-size:11px; color:var(--muted-text);" x-text="analyticsTopProducts.length + ' ranked'"></span>
+                  </div>
+                  <div class="adm-rank-list" x-show="analyticsTopProducts.length > 0">
+                    <template x-for="(item, idx) in analyticsTopProducts" :key="'atp-' + item.sku">
+                      <div class="adm-rank-row">
+                        <div class="adm-rank-left">
+                          <span class="adm-rank-num" x-text="'#' + (idx + 1)"></span>
+                          <span class="adm-lot-thumb" aria-hidden="true">
+                            <img :src="productImage(item)" alt="" width="36" height="36" loading="lazy" @error.once="$el.src = '/static/images/product-placeholder.svg'">
+                          </span>
+                          <div style="min-width:0;">
+                            <strong class="adm-cell-main" x-text="item.product_name"></strong>
+                            <span class="adm-cell-sub" x-text="item.category_name + ' · ' + item.sku"></span>
+                          </div>
+                        </div>
+                        <div style="text-align:right; flex-shrink:0;">
+                          <strong class="adm-mono" x-text="formatMoney(item.total_sales_volume)"></strong>
+                          <span class="adm-cell-sub adm-mono" x-text="item.units_sold + ' sold'"></span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                  <p class="adm-empty" x-show="analyticsTopProducts.length === 0">No product sales recorded in this date range.</p>
+                </div>
+              </div>
+
+              <div class="adm-card is-flush">
+                <div class="adm-card-head" style="padding:18px 20px 12px; margin-bottom:0;">
+                  <div>
+                    <h2>Product Margin &amp; Costing Analysis</h2>
+                    <p>Estimated recipe cost based on latest purchase prices</p>
+                  </div>
+                  <div class="adm-filter-right">
+                    <label class="adm-sr-only" for="margin-sort">Sort costing rows</label>
+                    <select id="margin-sort" class="adm-select" x-model="analyticsMarginSort">
+                      <option value="profit_desc">Highest Profit</option>
+                      <option value="margin_desc">Highest Margin %</option>
+                      <option value="margin_asc">Lowest Margin %</option>
+                      <option value="cogs_desc">Highest Est. Cost</option>
+                    </select>
+                    <label class="adm-search" for="margin-search">
+                      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-search"></use></svg>
+                      <input id="margin-search" type="search" x-model="analyticsMarginSearch" placeholder="Search item or SKU..." autocomplete="off">
+                    </label>
+                  </div>
+                </div>
+                <div class="adm-table-wrap">
+                  <table class="adm-table">
+                    <thead>
+                      <tr>
+                        <th>Menu Item</th>
+                        <th class="is-num">Selling Price</th>
+                        <th class="is-num">Est. Recipe Cost</th>
+                        <th class="is-num">Gross Profit</th>
+                        <th class="is-num">Gross Margin</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="row in filteredMarginRows()" :key="'mg-' + row.product_id">
+                        <tr>
+                          <td>
+                            <strong class="adm-cell-main" x-text="row.product_name"></strong>
+                            <span class="adm-cell-sub adm-mono" x-text="row.sku"></span>
+                          </td>
+                          <td class="is-num" x-text="formatMoney(row.selling_price)"></td>
+                          <td class="is-num" x-text="hasRecipe(row) ? formatMoney(row.estimated_cogs) : 'Not set'"></td>
+                          <td class="is-num"><strong x-text="hasRecipe(row) ? formatMoney(row.gross_profit) : '-'"></strong></td>
+                          <td class="is-num">
+                            <span class="adm-status" :class="!hasRecipe(row) ? '' : (Number(row.margin_percentage) >= 60 ? 'is-success' : (Number(row.margin_percentage) >= 35 ? 'is-warning' : 'is-danger'))">
+                              <span class="adm-mono" x-text="hasRecipe(row) ? (Number(row.margin_percentage || 0).toFixed(1) + '%') : 'No recipe'"></span>
+                            </span>
+                          </td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                  <p class="adm-empty" x-show="filteredMarginRows().length === 0">No menu items match your filter.</p>
+                </div>
+              </div>
+            </section>
+
+            <!-- PAGE 7: STAFF USERS -->
+            <section x-show="activeTab === 'users'" x-cloak x-transition:enter="adm-tab-enter" x-transition:enter-start="adm-tab-enter-start" x-transition:enter-end="adm-tab-enter-end" class="adm-stack" aria-label="Staff Users">
+              <div class="adm-card" x-show="!isAdmin()">
+                <p class="adm-empty">Admin role is required to view and provision staff accounts.</p>
+              </div>
+
+              <div x-show="isAdmin()" class="adm-stack">
+                <div class="adm-kpi-grid">
+                  <article class="adm-kpi">
+                    <span class="adm-kpi-label">Total Staff Users</span>
+                    <strong class="adm-kpi-value" x-text="users.length"></strong>
+                    <span class="adm-kpi-caption">Provisioned backoffice &amp; floor accounts</span>
+                  </article>
+                  <article class="adm-kpi">
+                    <span class="adm-kpi-label">Active Accounts</span>
+                    <strong class="adm-kpi-value is-success" x-text="activeUsersCount()"></strong>
+                    <span class="adm-kpi-caption">Active POS &amp; backoffice access</span>
+                  </article>
+                  <article class="adm-kpi">
+                    <span class="adm-kpi-label">Baristas &amp; Cashiers</span>
+                    <strong class="adm-kpi-value" x-text="users.filter(u => u.role === 'cashier').length"></strong>
+                    <span class="adm-kpi-caption">Floor &amp; counter team</span>
+                  </article>
+                  <article class="adm-kpi">
+                    <span class="adm-kpi-label">Inactive / Pending</span>
+                    <strong class="adm-kpi-value" x-text="users.filter(u => !u.is_active).length"></strong>
+                    <span class="adm-kpi-caption">Awaiting approval or deactivated</span>
+                  </article>
+                </div>
+
+                <div class="adm-filter-bar">
+                  <div class="adm-seg" role="tablist" aria-label="Filter staff status">
+                    <button type="button" role="tab" class="adm-seg-btn" :class="{ 'is-active': staffStatusTab === 'all' }" :aria-selected="staffStatusTab === 'all'" @click="staffStatusTab = 'all'">
+                      <span>All Staff</span>
+                      <span class="adm-mono" style="font-size:11px; color:var(--muted-text);" x-text="users.length"></span>
+                    </button>
+                    <button type="button" role="tab" class="adm-seg-btn" :class="{ 'is-active': staffStatusTab === 'active' }" :aria-selected="staffStatusTab === 'active'" @click="staffStatusTab = 'active'">
+                      <span>Active</span>
+                      <span class="adm-mono" style="font-size:11px; color:var(--muted-text);" x-text="activeUsersCount()"></span>
+                    </button>
+                    <button type="button" role="tab" class="adm-seg-btn" :class="{ 'is-active': staffStatusTab === 'inactive' }" :aria-selected="staffStatusTab === 'inactive'" @click="staffStatusTab = 'inactive'">
+                      <span>Inactive</span>
+                      <span class="adm-mono" style="font-size:11px; color:var(--muted-text);" x-text="users.filter(u => !u.is_active).length"></span>
+                    </button>
+                  </div>
+
+                  <div class="adm-filter-right">
+                    <label class="adm-sr-only" for="staff-role-filter">Filter role</label>
+                    <select id="staff-role-filter" class="adm-select" x-model="staffRoleFilter">
+                      <option value="">All Roles</option>
+                      <option value="admin">Admin</option>
+                      <option value="manager">Manager</option>
+                      <option value="cashier">Cashier</option>
+                    </select>
+                    <label class="adm-search" for="staff-search">
+                      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-search"></use></svg>
+                      <input id="staff-search" type="search" x-model="staffSearch" placeholder="Search name, email, role..." autocomplete="off">
+                    </label>
+                    <button type="button" class="adm-btn is-primary" @click="openNewStaffModal()">+ Add Staff</button>
+                  </div>
+                </div>
+
+                <div class="adm-card is-flush">
+                  <div class="adm-table-wrap">
+                    <table class="adm-table">
+                      <thead>
+                        <tr>
+                          <th>Staff Member</th>
+                          <th>Role</th>
+                          <th>Access Scope</th>
+                          <th>Login ID</th>
+                          <th>Status</th>
+                          <th class="is-num">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="u in filteredStaff()" :key="'u-' + u.id">
+                          <tr>
+                            <td>
+                              <div style="display:flex; align-items:center; gap:10px;">
+                                <span class="adm-avatar" aria-hidden="true">
+                                  <template x-if="u.avatar_url"><img :src="u.avatar_url" alt="" width="32" height="32" @error="$el.hidden = true"></template>
+                                  <span x-show="!u.avatar_url" x-text="userInitials(u.full_name)"></span>
+                                </span>
+                                <div>
+                                  <strong class="adm-cell-main" x-text="u.full_name"></strong>
+                                  <span class="adm-cell-sub" x-text="u.email"></span>
+                                </div>
+                              </div>
+                            </td>
+                            <td style="text-transform:capitalize; font-weight:500;" x-text="u.role"></td>
+                            <td>
+                              <span class="adm-cell-main" style="font-size:12px; font-weight:500;" x-text="u.role === 'admin' ? 'Full Backoffice & Admin' : (u.role === 'manager' ? 'Reports, Menu & Stock' : 'POS & Bar Orders')"></span>
+                              <span class="adm-cell-sub adm-mono" x-text="u.created_at ? ('Added ' + formatDateTime(u.created_at)) : 'Active staff'"></span>
+                            </td>
+                            <td>
+                              <div class="adm-actions">
+                                <span class="adm-mono" style="font-size:12px;" x-text="revealedIdMap[u.id] ? (u.username ? '@' + u.username : 'OAuth') : '••••'"></span>
+                                <button type="button" class="adm-btn is-ghost is-icon" @click="toggleRevealLogin(u.id)" :aria-label="revealedIdMap[u.id] ? 'Hide login ID' : 'Reveal login ID'">
+                                  <svg class="adm-icon" style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-eye"></use></svg>
+                                </button>
+                              </div>
+                            </td>
+                            <td>
+                              <span class="adm-status" :class="u.is_active ? 'is-success' : ''">
+                                <svg class="adm-icon" style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use :href="u.is_active ? '#adm-i-check' : '#adm-i-clock'"></use></svg>
+                                <span x-text="u.is_active ? 'Active' : 'Inactive'"></span>
+                              </span>
+                            </td>
+                            <td class="is-num">
+                              <div class="adm-actions">
+                                <button type="button" class="adm-btn" @click="openEditStaffModal(u)">
+                                  <svg class="adm-icon" style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-edit"></use></svg>
+                                  <span>Edit</span>
+                                </button>
+                                <button type="button" class="adm-btn is-ghost is-icon" @click="toggleUserActive(u)" :disabled="busy || u.id === user?.id" :aria-label="u.is_active ? ('Deactivate ' + u.full_name) : ('Activate ' + u.full_name)" :title="u.id === user?.id ? 'Current account' : (u.is_active ? 'Deactivate' : 'Activate')">
+                                  <svg class="adm-icon" style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-trash"></use></svg>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                    <p class="adm-empty" x-show="filteredStaff().length === 0">No staff accounts match your filter.</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </template>
+      </main>
+    </div>
+  </div>
+
+  <!-- MODAL: VOID TICKET -->
+  <div x-show="voidModalSale" x-cloak x-transition:enter="adm-overlay-enter" x-transition:enter-start="adm-overlay-enter-start" x-transition:enter-end="adm-overlay-enter-end" x-transition:leave="adm-overlay-leave" x-transition:leave-start="adm-overlay-leave-start" x-transition:leave-end="adm-overlay-leave-end" class="adm-overlay no-print" @click.self="closeVoidModal()" role="dialog" aria-modal="true" aria-labelledby="void-modal-title">
+    <section class="adm-modal" tabindex="-1">
+      <div class="adm-modal-head">
+        <div>
+          <h2 id="void-modal-title" x-text="'Void Ticket ' + shortInvoice(voidModalSale?.invoice_number)"></h2>
+          <p class="adm-cell-sub adm-mono" x-text="ticketGuest(voidModalSale) + ' · ' + formatMoney(voidModalSale?.total_amount)"></p>
+        </div>
+        <button type="button" class="adm-btn is-ghost is-icon" @click="closeVoidModal()" aria-label="Close modal">
+          <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-close"></use></svg>
+        </button>
+      </div>
+
+      <p style="font-size:12px; font-weight:600; margin-bottom:8px;">Quick Reason Presets</p>
+      <div class="adm-presets">
+        <template x-for="preset in voidReasonPresets" :key="preset">
+          <button type="button" class="adm-chip" :class="{ 'is-active': voidReason === preset }" @click="voidReason = preset" x-text="preset"></button>
+        </template>
+      </div>
+
+      <div class="adm-field">
+        <label for="void-audit-reason">Audit Reason</label>
+        <input id="void-audit-reason" class="adm-input" type="text" maxlength="200" x-model="voidReason" placeholder="Enter reason for voiding this ticket...">
+      </div>
+
+      <div class="adm-modal-foot">
+        <button type="button" class="adm-btn" @click="closeVoidModal()" :disabled="busy">Cancel</button>
+        <button type="button" class="adm-btn is-danger" @click="confirmVoidSale()" :disabled="busy" x-text="busy ? 'Voiding...' : 'Confirm Void'"></button>
+      </div>
+    </section>
+  </div>
+
+  <!-- MODAL: ADD / EDIT PRODUCT -->
+  <div x-show="productModalOpen" x-cloak x-transition:enter="adm-overlay-enter" x-transition:enter-start="adm-overlay-enter-start" x-transition:enter-end="adm-overlay-enter-end" x-transition:leave="adm-overlay-leave" x-transition:leave-start="adm-overlay-leave-start" x-transition:leave-end="adm-overlay-leave-end" class="adm-overlay no-print" @click.self="productModalOpen = false" role="dialog" aria-modal="true" aria-labelledby="prod-modal-title">
+    <form class="adm-modal" @submit.prevent="saveProduct()">
+      <div class="adm-modal-head">
+        <h2 id="prod-modal-title" x-text="productForm.id ? 'Edit Menu Item' : 'New Menu Item'"></h2>
+        <button type="button" class="adm-btn is-ghost is-icon" @click="productModalOpen = false" aria-label="Close modal">
+          <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-close"></use></svg>
+        </button>
+      </div>
+      <div class="adm-profile-banner">
+        <span class="adm-upload-preview" aria-hidden="true">
+          <img :src="productForm.image_url || '/static/images/product-placeholder.svg'" alt="" width="48" height="48" @error="$el.src = '/static/images/product-placeholder.svg'">
+        </span>
+        <div class="adm-profile-identity">
+          <strong>Item Photo</strong>
+          <span>Local PNG, JPG, or WebP · max 2 MB</span>
+        </div>
+        <div class="adm-actions">
+          <input type="file" accept="image/png,image/jpeg,image/webp" class="adm-sr-only" x-ref="productPhotoInput" @change="uploadProductImage($event)">
+          <button type="button" class="adm-btn" @click="$refs.productPhotoInput.click()" :disabled="productImageUploading" x-text="productImageUploading ? 'Uploading...' : 'Upload Photo'"></button>
+          <button type="button" class="adm-btn is-danger-outline" x-show="productForm.image_url" @click="removeProductImage()" :disabled="busy || productImageUploading">Remove</button>
+        </div>
+      </div>
+      <div class="adm-form-grid">
+        <div class="adm-field">
+          <label for="pf-cat">Category</label>
+          <select id="pf-cat" class="adm-select" x-model="productForm.category_id" required>
+            <option value="">Select category...</option>
+            <template x-for="c in categories" :key="'pfc-' + c.id">
+              <option :value="String(c.id)" x-text="c.name"></option>
+            </template>
+          </select>
+        </div>
+        <div class="adm-field">
+          <label for="pf-sku">SKU</label>
+          <input id="pf-sku" class="adm-input adm-mono" type="text" maxlength="30" x-model="productForm.sku" placeholder="MNU-LATTE" required>
+        </div>
+        <div class="adm-field">
+          <label for="pf-name">Item Name</label>
+          <input id="pf-name" class="adm-input" type="text" maxlength="100" x-model="productForm.name" placeholder="Iced Latte" required>
+        </div>
+        <div class="adm-field">
+          <label for="pf-price">Selling Price</label>
+          <input id="pf-price" class="adm-input adm-mono" type="number" step="0.01" min="0" x-model="productForm.price" placeholder="26000" required>
+        </div>
+      </div>
+      <div class="adm-modal-foot">
+        <button type="button" class="adm-btn" @click="productModalOpen = false">Cancel</button>
+        <button type="submit" class="adm-btn is-primary" :disabled="busy || productImageUploading" x-text="productForm.id ? 'Save Changes' : 'Create Item'"></button>
+      </div>
+    </form>
+  </div>
+
+  <!-- MODAL: MANAGE CATEGORIES -->
+  <div x-show="categoryModalOpen" x-cloak x-transition:enter="adm-overlay-enter" x-transition:enter-start="adm-overlay-enter-start" x-transition:enter-end="adm-overlay-enter-end" x-transition:leave="adm-overlay-leave" x-transition:leave-start="adm-overlay-leave-start" x-transition:leave-end="adm-overlay-leave-end" class="adm-overlay no-print" @click.self="categoryModalOpen = false" role="dialog" aria-modal="true" aria-labelledby="cat-modal-title">
+    <section class="adm-modal">
+      <div class="adm-modal-head">
+        <h2 id="cat-modal-title">Menu Categories</h2>
+        <button type="button" class="adm-btn is-ghost is-icon" @click="categoryModalOpen = false" aria-label="Close modal">
+          <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-close"></use></svg>
+        </button>
+      </div>
+      <form class="adm-form-grid" style="margin-bottom:14px;" @submit.prevent="saveCategory()">
+        <div class="adm-field">
+          <label for="cat-name">Category Name</label>
+          <input id="cat-name" class="adm-input" type="text" maxlength="50" x-model="catForm.name" placeholder="Seasonal" required>
+        </div>
+        <div class="adm-field">
+          <label for="cat-desc">Description</label>
+          <input id="cat-desc" class="adm-input" type="text" x-model="catForm.description" placeholder="Optional note">
+        </div>
+        <div class="adm-field is-full">
+          <div class="adm-actions">
+            <button type="submit" class="adm-btn is-primary" :disabled="busy" x-text="catForm.id ? 'Update Category' : 'Add Category'"></button>
+            <button type="button" class="adm-btn" x-show="catForm.id" @click="resetCategoryForm()">Cancel Edit</button>
+          </div>
+        </div>
+      </form>
+      <div class="adm-table-wrap">
+        <table class="adm-table">
+          <thead><tr><th>Name</th><th class="is-num">Actions</th></tr></thead>
+          <tbody>
+            <template x-for="c in categories" :key="'cm-' + c.id">
+              <tr>
+                <td><strong x-text="c.name"></strong><span class="adm-cell-sub" x-text="c.description || '-'"></span></td>
+                <td class="is-num">
+                  <div class="adm-actions">
+                    <button type="button" class="adm-btn" @click="editCategory(c)">Edit</button>
+                    <button type="button" class="adm-btn is-danger-outline" @click="deleteCategory(c.id)" :disabled="busy">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- MODAL: QUICK RESTOCK PO -->
+  <div x-show="restockMaterial" x-cloak x-transition:enter="adm-overlay-enter" x-transition:enter-start="adm-overlay-enter-start" x-transition:enter-end="adm-overlay-enter-end" x-transition:leave="adm-overlay-leave" x-transition:leave-start="adm-overlay-leave-start" x-transition:leave-end="adm-overlay-leave-end" class="adm-overlay no-print" @click.self="restockMaterial = null" role="dialog" aria-modal="true" aria-labelledby="restock-modal-title">
+    <form class="adm-modal" @submit.prevent="submitQuickRestock()">
+      <div class="adm-modal-head">
+        <div>
+          <h2 id="restock-modal-title" x-text="'Restock ' + (restockMaterial?.name || '')"></h2>
+          <p class="adm-cell-sub adm-mono" x-text="(restockMaterial?.sku || '') + ' · Current: ' + (restockMaterial?.current_stock || 0) + ' ' + (restockMaterial?.unit_symbol || '')"></p>
+        </div>
+        <button type="button" class="adm-btn is-ghost is-icon" @click="restockMaterial = null" aria-label="Close modal">
+          <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-close"></use></svg>
+        </button>
+      </div>
+      <div class="adm-form-grid">
+        <div class="adm-field is-full">
+          <label for="rs-sup">Supplier</label>
+          <select id="rs-sup" class="adm-select" x-model="restockForm.supplier_id" required>
+            <option value="">Select supplier...</option>
+            <template x-for="s in suppliers" :key="'sup-' + s.id">
+              <option :value="String(s.id)" x-text="s.name"></option>
+            </template>
+          </select>
+        </div>
+        <div class="adm-field">
+          <label for="rs-qty" x-text="'Quantity (' + (restockMaterial?.unit_symbol || '') + ')'"></label>
+          <input id="rs-qty" class="adm-input adm-mono" type="number" step="0.01" min="0.01" x-model="restockForm.quantity" required>
+        </div>
+        <div class="adm-field">
+          <label for="rs-price">Unit Price</label>
+          <input id="rs-price" class="adm-input adm-mono" type="number" step="0.01" min="0" x-model="restockForm.unit_price" required>
+        </div>
+        <div class="adm-field is-full">
+          <label for="rs-notes">PO Note (optional)</label>
+          <input id="rs-notes" class="adm-input" type="text" x-model="restockForm.notes" placeholder="Batch delivery note">
+        </div>
+      </div>
+      <div class="adm-modal-foot">
+        <button type="button" class="adm-btn" @click="restockMaterial = null">Cancel</button>
+        <button type="submit" class="adm-btn is-primary" :disabled="busy" x-text="busy ? 'Recording PO...' : 'Record Restock PO'"></button>
+      </div>
+    </form>
+  </div>
+
+  <!-- MODAL: ADD / EDIT ROASTERY LOT -->
+  <div x-show="materialModalOpen" x-cloak x-transition:enter="adm-overlay-enter" x-transition:enter-start="adm-overlay-enter-start" x-transition:enter-end="adm-overlay-enter-end" x-transition:leave="adm-overlay-leave" x-transition:leave-start="adm-overlay-leave-start" x-transition:leave-end="adm-overlay-leave-end" class="adm-overlay no-print" @click.self="materialModalOpen = false" role="dialog" aria-modal="true" aria-labelledby="mat-modal-title">
+    <form class="adm-modal" @submit.prevent="saveMaterial()">
+      <div class="adm-modal-head">
+        <h2 id="mat-modal-title" x-text="materialForm.id ? 'Edit Roastery Lot' : 'New Roastery Lot'"></h2>
+        <button type="button" class="adm-btn is-ghost is-icon" @click="materialModalOpen = false" aria-label="Close modal">
+          <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-close"></use></svg>
+        </button>
+      </div>
+      <div class="adm-profile-banner">
+        <span class="adm-upload-preview" aria-hidden="true">
+          <template x-if="materialForm.image_url">
+            <img :src="materialForm.image_url" alt="" width="48" height="48" @error="$el.hidden = true">
+          </template>
+          <svg x-show="!materialForm.image_url" class="adm-icon" style="width:20px;height:20px;color:var(--muted-text);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><use href="#adm-i-box"></use></svg>
+        </span>
+        <div class="adm-profile-identity">
+          <strong>Lot / Bean Photo</strong>
+          <span>Local PNG, JPG, or WebP · max 2 MB</span>
+        </div>
+        <div class="adm-actions">
+          <input type="file" accept="image/png,image/jpeg,image/webp" class="adm-sr-only" x-ref="materialPhotoInput" @change="uploadMaterialImage($event)">
+          <button type="button" class="adm-btn" @click="$refs.materialPhotoInput.click()" :disabled="materialImageUploading" x-text="materialImageUploading ? 'Uploading...' : 'Upload Photo'"></button>
+          <button type="button" class="adm-btn is-danger-outline" x-show="materialForm.image_url" @click="removeMaterialImage()" :disabled="busy || materialImageUploading">Remove</button>
+        </div>
+      </div>
+      <div class="adm-form-grid">
+        <div class="adm-field">
+          <label for="mf-name">Lot / Material Name</label>
+          <input id="mf-name" class="adm-input" type="text" maxlength="100" x-model="materialForm.name" placeholder="Ethiopia Guji Washed" required>
+        </div>
+        <div class="adm-field">
+          <label for="mf-sku">SKU</label>
+          <input id="mf-sku" class="adm-input adm-mono" type="text" maxlength="30" x-model="materialForm.sku" placeholder="RM-BEAN-GUJI" required>
+        </div>
+        <div class="adm-field">
+          <label for="mf-unit">Unit</label>
+          <select id="mf-unit" class="adm-select" x-model="materialForm.unit_id" required>
+            <option value="">Select unit...</option>
+            <template x-for="u in units" :key="'mu-' + u.id">
+              <option :value="String(u.id)" x-text="u.name + ' (' + u.symbol + ')'"></option>
+            </template>
+          </select>
+        </div>
+        <div class="adm-field">
+          <label for="mf-par">Par / Minimum Stock</label>
+          <input id="mf-par" class="adm-input adm-mono" type="number" step="0.01" min="0" x-model="materialForm.minimum_stock" placeholder="500" required>
+        </div>
+      </div>
+      <div class="adm-modal-foot">
+        <button type="button" class="adm-btn" @click="materialModalOpen = false">Cancel</button>
+        <button type="submit" class="adm-btn is-primary" :disabled="busy || materialImageUploading" x-text="materialForm.id ? 'Save Lot' : 'Create Lot'"></button>
+      </div>
+    </form>
+  </div>
+
+  <!-- MODAL: STOCK OPNAME & WASTE -->
+  <div x-show="stockActionMaterial" x-cloak x-transition:enter="adm-overlay-enter" x-transition:enter-start="adm-overlay-enter-start" x-transition:enter-end="adm-overlay-enter-end" x-transition:leave="adm-overlay-leave" x-transition:leave-start="adm-overlay-leave-start" x-transition:leave-end="adm-overlay-leave-end" class="adm-overlay no-print" @click.self="stockActionMaterial = null" role="dialog" aria-modal="true" aria-labelledby="stock-action-title">
+    <section class="adm-modal">
+      <div class="adm-modal-head">
+        <div>
+          <h2 id="stock-action-title" x-text="'Inventory Control · ' + (stockActionMaterial?.name || '')"></h2>
+          <p class="adm-cell-sub adm-mono" x-text="(stockActionMaterial?.sku || '') + ' · Current: ' + (stockActionMaterial?.current_stock || 0) + ' ' + (stockActionMaterial?.unit_symbol || '')"></p>
+        </div>
+        <button type="button" class="adm-btn is-ghost is-icon" @click="stockActionMaterial = null" aria-label="Close modal">
+          <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-close"></use></svg>
+        </button>
+      </div>
+      <div class="adm-seg adm-account-tabs" role="tablist" aria-label="Stock action mode">
+        <button type="button" role="tab" class="adm-seg-btn" :class="{ 'is-active': stockActionMode === 'adjust' }" :aria-selected="stockActionMode === 'adjust'" @click="stockActionMode = 'adjust'">Stock Opname</button>
+        <button type="button" role="tab" class="adm-seg-btn" :class="{ 'is-active': stockActionMode === 'waste' }" :aria-selected="stockActionMode === 'waste'" @click="stockActionMode = 'waste'">Record Waste</button>
+      </div>
+
+      <form x-show="stockActionMode === 'adjust'" @submit.prevent="submitStockAdjustment()">
+        <div class="adm-form-grid">
+          <div class="adm-field">
+            <label for="sa-actual" x-text="'Actual Count (' + (stockActionMaterial?.unit_symbol || '') + ')'"></label>
+            <input id="sa-actual" class="adm-input adm-mono" type="number" step="0.01" min="0" x-model="adjustForm.actual_stock" required>
+          </div>
+          <div class="adm-field">
+            <label>Variance Preview</label>
+            <div class="adm-input adm-mono" style="display:flex; align-items:center; background:var(--surface-subtle);" x-text="stockVarianceLabel()"></div>
+          </div>
+          <div class="adm-field is-full">
+            <label for="sa-notes">Opname Audit Note</label>
+            <input id="sa-notes" class="adm-input" type="text" maxlength="255" x-model="adjustForm.notes" placeholder="e.g. Evening physical scale check" required>
+          </div>
+        </div>
+        <div class="adm-modal-foot">
+          <button type="button" class="adm-btn" @click="stockActionMaterial = null">Cancel</button>
+          <button type="submit" class="adm-btn is-primary" :disabled="busy" x-text="busy ? 'Saving...' : 'Save Opname'"></button>
+        </div>
+      </form>
+
+      <form x-show="stockActionMode === 'waste'" @submit.prevent="submitStockWaste()">
+        <div class="adm-form-grid">
+          <div class="adm-field is-full">
+            <label for="sw-qty" x-text="'Waste Quantity (' + (stockActionMaterial?.unit_symbol || '') + ')'"></label>
+            <input id="sw-qty" class="adm-input adm-mono" type="number" step="0.01" min="0.01" x-model="wasteForm.quantity" placeholder="e.g. 25" required>
+          </div>
+          <div class="adm-field is-full">
+            <label for="sw-notes">Waste / Spoilage Reason</label>
+            <input id="sw-notes" class="adm-input" type="text" maxlength="255" x-model="wasteForm.notes" placeholder="e.g. Dial-in purge, expired milk, spill" required>
+          </div>
+        </div>
+        <div class="adm-modal-foot">
+          <button type="button" class="adm-btn" @click="stockActionMaterial = null">Cancel</button>
+          <button type="submit" class="adm-btn is-danger" :disabled="busy" x-text="busy ? 'Recording...' : 'Record Waste'"></button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <!-- MODAL: STOCK MUTATION LEDGER -->
+  <div x-show="ledgerMaterial" x-cloak x-transition:enter="adm-overlay-enter" x-transition:enter-start="adm-overlay-enter-start" x-transition:enter-end="adm-overlay-enter-end" x-transition:leave="adm-overlay-leave" x-transition:leave-start="adm-overlay-leave-start" x-transition:leave-end="adm-overlay-leave-end" class="adm-overlay no-print" @click.self="ledgerMaterial = null" role="dialog" aria-modal="true" aria-labelledby="ledger-modal-title">
+    <section class="adm-modal adm-modal-wide">
+      <div class="adm-modal-head">
+        <div>
+          <h2 id="ledger-modal-title" x-text="'Stock Ledger · ' + (ledgerMaterial?.name || '')"></h2>
+          <p class="adm-cell-sub adm-mono" x-text="(ledgerMaterial?.sku || '') + ' · Current: ' + formatStockQty(ledgerMaterial?.current_stock, ledgerMaterial?.unit_symbol)"></p>
+        </div>
+        <button type="button" class="adm-btn is-ghost is-icon" @click="ledgerMaterial = null" aria-label="Close ledger">
+          <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-close"></use></svg>
+        </button>
+      </div>
+      <div class="adm-table-wrap">
+        <table class="adm-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Type</th>
+              <th class="is-num">Qty</th>
+              <th class="is-num">Before &rarr; After</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="m in ledgerMutations" :key="'mut-' + m.id">
+              <tr>
+                <td class="adm-mono" style="font-size:11px; white-space:nowrap;" x-text="formatDateTime(m.created_at)"></td>
+                <td>
+                  <span class="adm-status" :class="m.mutation_type === 'in' ? 'is-success' : (m.mutation_type === 'waste' ? 'is-danger' : 'is-warning')" style="text-transform:uppercase; font-size:11px;" x-text="m.mutation_type"></span>
+                </td>
+                <td class="is-num" x-text="m.quantity + ' ' + (ledgerMaterial?.unit_symbol || '')"></td>
+                <td class="is-num" x-text="m.stock_before + ' → ' + m.stock_after"></td>
+                <td style="font-size:12px; color:var(--muted-text);" x-text="m.notes || m.reference_type"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+        <p class="adm-empty" x-show="ledgerMutations.length === 0">No stock mutations recorded for this lot yet.</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- MODAL: MANAGE UNITS -->
+  <div x-show="unitModalOpen" x-cloak x-transition:enter="adm-overlay-enter" x-transition:enter-start="adm-overlay-enter-start" x-transition:enter-end="adm-overlay-enter-end" x-transition:leave="adm-overlay-leave" x-transition:leave-start="adm-overlay-leave-start" x-transition:leave-end="adm-overlay-leave-end" class="adm-overlay no-print" @click.self="unitModalOpen = false" role="dialog" aria-modal="true" aria-labelledby="unit-modal-title">
+    <section class="adm-modal">
+      <div class="adm-modal-head">
+        <h2 id="unit-modal-title">Measurement Units</h2>
+        <button type="button" class="adm-btn is-ghost is-icon" @click="unitModalOpen = false" aria-label="Close modal">
+          <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-close"></use></svg>
+        </button>
+      </div>
+      <form class="adm-form-grid" style="margin-bottom:14px;" @submit.prevent="saveUnit()">
+        <div class="adm-field">
+          <label for="un-name">Unit Name</label>
+          <input id="un-name" class="adm-input" type="text" maxlength="30" x-model="unitForm.name" placeholder="Kilogram" required>
+        </div>
+        <div class="adm-field">
+          <label for="un-sym">Symbol</label>
+          <input id="un-sym" class="adm-input adm-mono" type="text" maxlength="10" x-model="unitForm.symbol" placeholder="kg" required>
+        </div>
+        <div class="adm-field is-full">
+          <div class="adm-actions">
+            <button type="submit" class="adm-btn is-primary" :disabled="busy" x-text="unitForm.id ? 'Update Unit' : 'Add Unit'"></button>
+            <button type="button" class="adm-btn" x-show="unitForm.id" @click="unitForm = { id: null, name: '', symbol: '' }">Cancel Edit</button>
+          </div>
+        </div>
+      </form>
+      <div class="adm-table-wrap">
+        <table class="adm-table">
+          <thead><tr><th>Name</th><th>Symbol</th><th class="is-num">Actions</th></tr></thead>
+          <tbody>
+            <template x-for="u in units" :key="'um-' + u.id">
+              <tr>
+                <td><strong x-text="u.name"></strong></td>
+                <td class="adm-mono" x-text="u.symbol"></td>
+                <td class="is-num">
+                  <div class="adm-actions">
+                    <button type="button" class="adm-btn" @click="unitForm = { id: u.id, name: u.name, symbol: u.symbol }">Edit</button>
+                    <button type="button" class="adm-btn is-danger-outline" @click="deleteUnit(u.id)" :disabled="busy">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- MODAL: CREATE MULTI-ITEM PURCHASE ORDER -->
+  <div x-show="poModalOpen" x-cloak x-transition:enter="adm-overlay-enter" x-transition:enter-start="adm-overlay-enter-start" x-transition:enter-end="adm-overlay-enter-end" x-transition:leave="adm-overlay-leave" x-transition:leave-start="adm-overlay-leave-start" x-transition:leave-end="adm-overlay-leave-end" class="adm-overlay no-print" @click.self="poModalOpen = false" role="dialog" aria-modal="true" aria-labelledby="po-modal-title">
+    <form class="adm-modal adm-modal-wide" @submit.prevent="submitPurchaseOrder()">
+      <div class="adm-modal-head">
+        <div>
+          <h2 id="po-modal-title">New Purchase Order</h2>
+          <p class="adm-cell-sub">Record inbound deliveries and update raw material stock + latest purchase cost.</p>
+        </div>
+        <button type="button" class="adm-btn is-ghost is-icon" @click="poModalOpen = false" aria-label="Close modal">
+          <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-close"></use></svg>
+        </button>
+      </div>
+      <div class="adm-form-grid" style="margin-bottom:14px;">
+        <div class="adm-field">
+          <label for="po-sup">Supplier</label>
+          <select id="po-sup" class="adm-select" x-model="poForm.supplier_id" required>
+            <option value="">Select supplier...</option>
+            <template x-for="s in suppliers" :key="'posup-' + s.id">
+              <option :value="String(s.id)" x-text="s.name"></option>
+            </template>
+          </select>
+        </div>
+        <div class="adm-field">
+          <label for="po-notes">Delivery Note (optional)</label>
+          <input id="po-notes" class="adm-input" type="text" x-model="poForm.notes" placeholder="Weekly roastery delivery">
+        </div>
+      </div>
+
+      <div class="adm-card-head" style="margin-bottom:8px;">
+        <h3 style="font-size:12px; font-weight:600;">Order Line Items</h3>
+        <button type="button" class="adm-btn" @click="addPoLine()">+ Add Line</button>
+      </div>
+
+      <div class="adm-po-lines">
+        <template x-for="(line, lIdx) in poForm.items" :key="'pol-' + lIdx">
+          <div class="adm-po-line-row">
+            <select class="adm-select" x-model="line.raw_material_id" @change="prefillPoLinePrice(line)" aria-label="Raw material" required>
+              <option value="">Select material...</option>
+              <template x-for="rm in inventoryRows" :key="'porm-' + rm.id">
+                <option :value="String(rm.id)" x-text="rm.name + ' (' + rm.unit_symbol + ')'"></option>
+              </template>
+            </select>
+            <input class="adm-input adm-mono" type="number" step="0.01" min="0.01" x-model="line.quantity" placeholder="Qty" aria-label="Quantity" required>
+            <input class="adm-input adm-mono" type="number" step="0.01" min="0" x-model="line.unit_price" placeholder="Unit price" aria-label="Unit price" required>
+            <strong class="adm-mono adm-po-sub" x-text="formatMoney(Number(line.quantity || 0) * Number(line.unit_price || 0))"></strong>
+            <button type="button" class="adm-btn is-danger-outline is-icon" @click="removePoLine(lIdx)" :disabled="poForm.items.length <= 1" aria-label="Remove line">
+              <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-trash"></use></svg>
+            </button>
+          </div>
+        </template>
+      </div>
+
+      <div class="adm-inspect-total" style="margin-top:14px;">
+        <span>Total PO Cost</span>
+        <span class="adm-mono" x-text="formatMoney(poFormTotal())"></span>
+      </div>
+
+      <div class="adm-modal-foot">
+        <button type="button" class="adm-btn" @click="poModalOpen = false">Cancel</button>
+        <button type="submit" class="adm-btn is-primary" :disabled="busy" x-text="busy ? 'Recording PO...' : 'Record Purchase Order'"></button>
+      </div>
+    </form>
+  </div>
+
+  <!-- MODAL: ADD / EDIT SUPPLIER -->
+  <div x-show="supplierModalOpen" x-cloak x-transition:enter="adm-overlay-enter" x-transition:enter-start="adm-overlay-enter-start" x-transition:enter-end="adm-overlay-enter-end" x-transition:leave="adm-overlay-leave" x-transition:leave-start="adm-overlay-leave-start" x-transition:leave-end="adm-overlay-leave-end" class="adm-overlay no-print" @click.self="supplierModalOpen = false" role="dialog" aria-modal="true" aria-labelledby="sup-modal-title">
+    <form class="adm-modal" @submit.prevent="saveSupplier()">
+      <div class="adm-modal-head">
+        <h2 id="sup-modal-title" x-text="supplierForm.id ? 'Edit Supplier' : 'Add Supplier'"></h2>
+        <button type="button" class="adm-btn is-ghost is-icon" @click="supplierModalOpen = false" aria-label="Close modal">
+          <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-close"></use></svg>
+        </button>
+      </div>
+      <div class="adm-form-grid">
+        <div class="adm-field is-full">
+          <label for="sf-name">Supplier Name</label>
+          <input id="sf-name" class="adm-input" type="text" maxlength="100" x-model="supplierForm.name" placeholder="Kopi Nusantara Roasters" required>
+        </div>
+        <div class="adm-field">
+          <label for="sf-phone">Phone (optional)</label>
+          <input id="sf-phone" class="adm-input adm-mono" type="text" maxlength="25" x-model="supplierForm.phone" placeholder="+62 812-...">
+        </div>
+        <div class="adm-field">
+          <label for="sf-email">Email (optional)</label>
+          <input id="sf-email" class="adm-input" type="email" maxlength="150" x-model="supplierForm.email" placeholder="orders@roaster.co.id">
+        </div>
+        <div class="adm-field is-full">
+          <label for="sf-addr">Address (optional)</label>
+          <input id="sf-addr" class="adm-input" type="text" x-model="supplierForm.address" placeholder="Street, city">
+        </div>
+      </div>
+      <div class="adm-modal-foot">
+        <button type="button" class="adm-btn" @click="supplierModalOpen = false">Cancel</button>
+        <button type="submit" class="adm-btn is-primary" :disabled="busy" x-text="supplierForm.id ? 'Save Supplier' : 'Create Supplier'"></button>
+      </div>
+    </form>
+  </div>
+
+  <!-- MODAL: ADD / EDIT STAFF -->
+  <div x-show="staffModalOpen" x-cloak x-transition:enter="adm-overlay-enter" x-transition:enter-start="adm-overlay-enter-start" x-transition:enter-end="adm-overlay-enter-end" x-transition:leave="adm-overlay-leave" x-transition:leave-start="adm-overlay-leave-start" x-transition:leave-end="adm-overlay-leave-end" class="adm-overlay no-print" @click.self="staffModalOpen = false" role="dialog" aria-modal="true" aria-labelledby="staff-modal-title">
+    <form class="adm-modal" @submit.prevent="saveStaff()">
+      <div class="adm-modal-head">
+        <h2 id="staff-modal-title" x-text="userForm.id ? 'Edit Staff Account' : 'Add Staff Account'"></h2>
+        <button type="button" class="adm-btn is-ghost is-icon" @click="staffModalOpen = false" aria-label="Close modal">
+          <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-close"></use></svg>
+        </button>
+      </div>
+      <div class="adm-form-grid">
+        <div class="adm-field">
+          <label for="nu-name">Full Name</label>
+          <input id="nu-name" class="adm-input" type="text" maxlength="100" x-model="userForm.full_name" placeholder="Staff full name" required>
+        </div>
+        <div class="adm-field">
+          <label for="nu-email">Email</label>
+          <input id="nu-email" class="adm-input" type="email" maxlength="150" x-model="userForm.email" :disabled="Boolean(userForm.id)" placeholder="staff@example.com" required>
+        </div>
+        <div class="adm-field" x-show="!userForm.id">
+          <label for="nu-user">Username (optional)</label>
+          <input id="nu-user" class="adm-input adm-mono" type="text" maxlength="50" x-model="userForm.username" placeholder="username">
+        </div>
+        <div class="adm-field">
+          <label for="nu-pass" x-text="userForm.id ? 'New Password (optional)' : 'Password (8+ chars, optional)'"></label>
+          <input id="nu-pass" class="adm-input" type="password" minlength="8" x-model="userForm.password" placeholder="Set password">
+        </div>
+        <div class="adm-field">
+          <label for="nu-role">Role</label>
+          <select id="nu-role" class="adm-select" x-model="userForm.role" :disabled="userForm.id === user?.id">
+            <option value="cashier">Cashier</option>
+            <option value="manager">Manager</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="adm-field" style="justify-content:flex-end;">
+          <label style="display:inline-flex; align-items:center; gap:8px; height:34px; color:var(--text);">
+            <input type="checkbox" x-model="userForm.is_active" :disabled="userForm.id === user?.id">
+            <span>Active account</span>
+          </label>
+        </div>
+      </div>
+      <div class="adm-modal-foot">
+        <button type="button" class="adm-btn" @click="staffModalOpen = false">Cancel</button>
+        <button type="submit" class="adm-btn is-primary" :disabled="busy" x-text="userForm.id ? 'Save Account' : 'Create Staff'"></button>
+      </div>
+    </form>
+  </div>
+
+  {{ adm_receipt_modal() }}
+  {{ adm_profile_modal() }}
+  {{ adm_print_popup() }}
+</div>
+{% endblock %}

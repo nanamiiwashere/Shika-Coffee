@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Shika Coffee: A little pause, brewed fresh.{% endblock %}
+{% block head %}
+<meta name="description" content="A little pause, brewed fresh. Get to know Shika Coffee and browse our current menu at your own pace.">
+<link rel="stylesheet" href="{{ url_for('static', path='css/landing.css') }}?v=20261118g">
+{% endblock %}
+{% block content %}
+<div class="landing-page" id="top">
+  <a class="landing-skip-link" href="#landing-main">Skip to content</a>
+
+  <header class="landing-header landing-shell" data-landing-header>
+    <a class="landing-brand" href="#top" aria-label="Shika Coffee home">
+      <span class="landing-logo-window">
+        <img src="{{ url_for('static', path='images/shika-logo.png') }}" alt="Shika Coffee" width="417" height="565" fetchpriority="high">
+      </span>
+    </a>
+    <button class="landing-nav-toggle" type="button" aria-controls="landing-navigation" aria-expanded="false" data-landing-nav-toggle hidden>
+      <span data-landing-nav-label>Open menu</span>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 8h16M4 16h16"/></svg>
+    </button>
+    <nav class="landing-navigation" id="landing-navigation" aria-label="Main navigation" data-landing-navigation>
+      <a href="#story">Our Story</a>
+      <a href="#menu">Our Menu</a>
+      <a href="#contact">Contact Us</a>
+    </nav>
+  </header>
+
+  <main id="landing-main" tabindex="-1">
+    <section class="landing-hero" aria-labelledby="landing-hero-heading">
+      <div class="landing-hero-inner landing-shell">
+        <div class="landing-hero-copy" data-landing-reveal="left">
+          <h1 id="landing-hero-heading">A little pause,<br>brewed fresh.</h1>
+          <p>Come for your favorite coffee, stay for something sweet, and make yourself at home at Shika Coffee.</p>
+          <div class="landing-hero-actions">
+            <a class="landing-button landing-button-primary" href="#menu">
+              Explore our menu
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg>
+            </a>
+            <a class="landing-button landing-button-outline" href="#story">Get to know Shika</a>
+          </div>
+        </div>
+        <div class="landing-hero-art" data-landing-reveal="right" style="--landing-reveal-delay: 120ms" role="img" aria-label="Shika’s smiling deer mascot holding a cup of coffee, surrounded by a lime-green shape and forest-green waves.">
+          <img class="landing-hero-blob" src="{{ url_for('static', path='images/blob.png') }}" alt="" width="1080" height="1350">
+          <span class="landing-ribbon landing-ribbon-top"><img src="{{ url_for('static', path='images/wave.png') }}" alt="" width="1080" height="1350"></span>
+          <img class="landing-hero-mascot" src="{{ url_for('static', path='images/mascot.png') }}" alt="" width="508" height="635" fetchpriority="high">
+          <span class="landing-ribbon landing-ribbon-bottom"><img src="{{ url_for('static', path='images/wave.png') }}" alt="" width="1080" height="1350"></span>
+        </div>
+      </div>
+    </section>
+
+    <div class="landing-tagline" aria-label="Slow drip. A little moment for yourself. Where stillness meets specialty coffee.">
+      <div class="landing-tagline-inner landing-shell" aria-hidden="true">
+        <span class="landing-tagline-item">
+          SLOW DRIP
+          <svg class="landing-cup-icon" width="34" height="34" viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 13h19v9a8 8 0 0 1-8 8h-3a8 8 0 0 1-8-8zM26 15h2a5 5 0 0 1 0 10h-3M5 32h24M12 4c-3 3 3 4 0 7M19 3c-3 3 3 4 0 7"/></svg>
+        </span>
+        <span class="landing-tagline-item">
+          A LITTLE MOMENT FOR YOURSELF
+          <svg class="landing-flower-icon" width="35" height="35" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M20 12c-9-15-19-5-12 2-16-1-15 13-5 13-8 12 5 19 10 9 4 15 18 10 14-1 13 6 19-7 8-12 14-6 7-18-4-12 2-14-12-15-11 1Z" transform="translate(3 1) scale(.85)"/><circle cx="20" cy="20" r="4"/></svg>
+        </span>
+        <span class="landing-tagline-item landing-tagline-last">
+          WHERE STILLNESS MEETS SPECIALTY COFFEE
+          <svg class="landing-beans-icon" width="34" height="34" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><g transform="rotate(35 12 14)"><ellipse cx="12" cy="14" rx="7" ry="10"/><path d="M12 4c-5 5 5 15 0 20"/></g><g transform="rotate(35 28 25)"><ellipse cx="28" cy="25" rx="7" ry="10"/><path d="M28 15c-5 5 5 15 0 20"/></g></svg>
+        </span>
+      </div>
+    </div>
+
+    <section class="landing-story landing-section landing-shell" id="story" aria-labelledby="landing-story-heading">
+      <div class="landing-story-content" data-landing-reveal="left">
+        <p class="landing-eyebrow">Our story</p>
+        <h2 id="landing-story-heading">Good coffee.<br>A gentler pace.</h2>
+        <div class="landing-story-copy">
+          <p>Some moments are better unhurried. A first sip, a conversation, a little break in the middle of it all.</p>
+          <p>That’s the feeling behind Shika. A warm invitation to slow down, enjoy your favorite cup, and make a little space for yourself.</p>
+          <a class="landing-text-link" href="#menu">Find your next little pause <span aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+      <figure class="landing-story-art" data-landing-reveal="right" style="--landing-reveal-delay: 140ms">
+        <div class="landing-story-scene">
+          {% include "_story_deer.html" %}
+        </div>
+
+      </figure>
+    </section>
+
+    <section class="landing-menu-section" id="menu" aria-labelledby="landing-menu-heading" data-landing-menu>
+      <div class="landing-section landing-shell">
+        <div class="landing-section-heading" data-landing-reveal>
+          <div>
+            <p class="landing-eyebrow">Our menu</p>
+            <h2 id="landing-menu-heading">Find your <span class="landing-heading-phrase">little favorite.</span></h2>
+          </div>
+          <p>A few coffee favorites for your next slow moment. Find your favorite, then enjoy it in-store.</p>
+        </div>
+
+        <div class="landing-menu-feedback" data-landing-reveal style="--landing-reveal-delay: 80ms">
+          <p class="landing-menu-status" role="status" aria-live="polite" aria-atomic="true" data-landing-menu-status>Enable JavaScript to load and browse our current menu.</p>
+          <button class="landing-button landing-button-outline landing-retry" type="button" data-landing-menu-retry hidden>Try again</button>
+        </div>
+        <ul class="landing-menu-grid" aria-label="Featured coffees" aria-busy="false" data-landing-menu-grid hidden></ul>
+
+      </div>
+    </section>
+
+    <section class="landing-contact landing-section landing-shell" id="contact" aria-labelledby="landing-contact-heading">
+      <div class="landing-contact-content" data-landing-reveal="left">
+        <p class="landing-eyebrow">Contact us</p>
+        <h2 id="landing-contact-heading">A good cup starts<br>with a little hello.</h2>
+        <div class="landing-contact-copy">
+          <p>Whether you’re finding a new favorite or just getting to know Shika, we’re glad you’re here.</p>
+          <p>Have a question about a drink or something sweet? Ask our team when you visit. We’re happy to help you find your favorite.</p>
+          <button class="landing-button landing-button-primary" type="button" data-landing-video-open aria-haspopup="dialog" aria-controls="landing-video-dialog">See what’s brewing <span aria-hidden="true">↗</span></button>
+        </div>
+      </div>
+      <figure class="landing-contact-art" data-landing-reveal="right" style="--landing-reveal-delay: 140ms">
+        <span class="landing-contact-greeting" aria-hidden="true">Hii, coffee friend!</span>
+        {% include "_contact_deer.html" %}
+
+      </figure>
+    </section>
+  </main>
+
+  <footer class="landing-footer">
+    <div class="landing-footer-inner landing-shell" data-landing-reveal>
+      <a class="landing-footer-name" href="#top">Shika Coffee<span>A little pause, brewed fresh.</span></a>
+      <div class="landing-footer-links">
+        <a class="landing-back-to-top" href="#top">Back to top <span aria-hidden="true">↑</span></a>
+        <a class="landing-staff-link" href="/login">Staff sign in <span aria-hidden="true">↗</span></a>
+      </div>
+    </div>
+  </footer>
+
+  <dialog id="landing-video-dialog" class="landing-video-dialog" data-landing-video-dialog aria-labelledby="landing-video-title">
+    <div class="landing-video-card">
+      <div class="landing-video-header">
+        <h2 id="landing-video-title">What’s brewing at Shika</h2>
+        <button type="button" class="landing-video-close" data-landing-video-close aria-label="Close video">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="landing-video-frame">
+        <iframe data-src="https://www.youtube-nocookie.com/embed/xnU24EjThyM?autoplay=1&controls=0&rel=0&iv_load_policy=3&playsinline=1&modestbranding=1" title="Shika Coffee: What’s brewing" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+      </div>
+    </div>
+  </dialog>
+</div>
+{% endblock %}
+{% block scripts %}
+<script defer src="{{ url_for('static', path='js/landing.js') }}?v=20261118g"></script>
+{% endblock %}

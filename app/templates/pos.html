@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+{% from "_pos_chrome.html" import icon, svg_defs, toast %}
+{% from "_adm_sidebar.html" import adm_svg_defs, adm_sidebar, adm_profile_modal, adm_receipt_modal, adm_print_popup %}
+{% block title %}Shika Coffee: POS System{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', path='css/admin-theme.css') }}?v=20261123n">
+<link rel="stylesheet" href="{{ url_for('static', path='css/pos.css') }}?v=20261124a">
+{% endblock %}
+{% block content %}
+<div class="pos-app" x-data="shikaPos()"
+  @keydown.window="if (( $event.metaKey || $event.ctrlKey ) && $event.key.toLowerCase() === 'k' && token && !receiptModal && !profileModalOpen && !qrisModal) { $event.preventDefault(); $refs.menuSearch.focus(); }"
+  @keydown.escape.window="sidebarOpen = false; menuOpen = false; modeOpen = false; notificationsOpen = false; if (profileModalOpen) closeProfileSettings(); if (qrisModal) cancelQrisCheckout(); if (receiptModal) receiptModal = null;">
+  {{ svg_defs() }}
+  {{ adm_svg_defs() }}
+  {{ toast() }}
+
+  <div x-show="token" x-cloak class="adm-shell no-print" :inert="receiptModal !== null || profileModalOpen || qrisModal !== null">
+    {{ adm_sidebar('pos') }}
+
+    <div class="adm-content-col">
+      <div class="pos-workspace">
+        <header class="adm-topbar">
+          <div class="adm-topbar-left">
+            <button type="button" class="adm-mobile-menu" @click="sidebarOpen = !sidebarOpen"
+              :aria-expanded="sidebarOpen" aria-label="Toggle navigation sidebar">
+              <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                aria-hidden="true">
+                <use href="#adm-i-menu"></use>
+              </svg>
+            </button>
+            <nav class="adm-breadcrumb" aria-label="Current location">
+              <span>Shika Roastery</span>
+              <span aria-hidden="true">/</span>
+              <strong>POS System</strong>
+              <span aria-hidden="true">·</span>
+              <time class="adm-mono" style="font-size:12px; color:var(--muted-text);" x-text="todayMonoDate"></time>
+            </nav>
+          </div>
+
+          <div class="adm-topbar-right">
+            <div class="pos-popover-anchor" @click.outside="notificationsOpen = false">
+              <button type="button" class="pos-icon-button pos-notifications-button"
+                @click="notificationsOpen = !notificationsOpen" :aria-expanded="notificationsOpen"
+                aria-controls="pos-notifications" aria-label="Stock notifications">
+                <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                  aria-hidden="true">
+                  <use href="#adm-i-bell"></use>
+                </svg>
+                <span class="pos-notification-dot" x-show="lowStockItems.length > 0"></span>
+              </button>
+              <section id="pos-notifications" x-show="notificationsOpen" x-cloak class="pos-popover"
+                aria-labelledby="pos-notifications-title">
+                <div class="pos-popover-heading">
+                  <h2 id="pos-notifications-title">Stock updates</h2><span x-text="lowStockItems.length"></span>
+                </div>
+                <p x-show="lowStockItems.length === 0" class="pos-popover-empty">All good. No low-stock alerts.</p>
+                <ul class="pos-stock-list"><template x-for="material in lowStockItems" :key="material.id">
+                    <li><span x-text="material.name"></span><small
+                        x-text="Number(material.current_stock) + ' ' + material.unit_symbol + ' left'"></small></li>
+                  </template></ul>
+                <a href="/dashboard?tab=roastery" x-show="isManager()" class="pos-popover-link">Open
+                  Roastery &amp; Beans {{ icon('arrow') }}</a>
+              </section>
+            </div>
+          </div>
+        </header>
+
+        <main class="pos-main">
+          <section class="pos-catalog" aria-label="Menu catalog">
+            <div class="pos-search">
+              {{ icon('search') }}
+              <input x-ref="menuSearch" type="search" x-model="searchQuery" @input="applyFilters()" placeholder="Search"
+                aria-label="Search menu by name or SKU" autocomplete="off">
+              <span class="pos-search-shortcut" aria-hidden="true">{{ icon('command') }}</span>
+            </div>
+
+            <div class="pos-categories" role="group" aria-label="Menu categories">
+              <template x-for="cat in displayCategories" :key="cat.id">
+                <button type="button" class="pos-category" :class="{ 'is-active': selectedCategory === cat.id }"
+                  :aria-pressed="selectedCategory === cat.id"
+                  @click="selectCategory(selectedCategory === cat.id ? null : cat.id)">
+                  <span class="pos-stock-badge" :class="{ 'is-low': categoryLowStock(cat) }"><span
+                      x-text="categoryLowStock(cat) ? 'Need to re-stock' : 'Available'"></span></span>
+                  <span class="pos-category-copy"><strong x-text="cat.name"></strong><small
+                      x-text="countByCategory(cat) + ' items'"></small></span>
+                  <svg class="pos-category-art pos-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <use :href="'#pos-icon-' + cat.art"></use>
+                  </svg>
+                </button>
+              </template>
+            </div>
+
+            <div class="pos-catalog-feedback" x-show="catalogLoading" role="status"><span
+                class="pos-spinner"></span>Getting
+              your menu ready…</div>
+            <div class="pos-catalog-feedback" x-show="catalogError && !catalogLoading" x-cloak role="alert">{{
+              icon('coffee') }}<h2>We couldn’t load the menu.</h2>
+              <p x-text="catalogError"></p><button type="button" class="pos-secondary" @click="loadProducts()">Try
+                again</button>
+            </div>
+            <div class="pos-catalog-feedback" x-show="!catalogLoading && !catalogError && products.length === 0"
+              x-cloak>{{
+              icon('search') }}<h2 x-text="searchQuery ? 'No matching items.' : 'Nothing here just yet.'"></h2>
+              <p
+                x-text="searchQuery ? 'Try another name, or explore all categories.' : 'Menu items will appear here when they are added.'">
+              </p><button type="button" class="pos-secondary" x-show="searchQuery || selectedCategory !== null"
+                @click="searchQuery = ''; selectCategory(null)">Show all items</button>
+            </div>
+
+            <div class="pos-product-grid" :aria-busy="catalogLoading" x-show="!catalogLoading && !catalogError">
+              <template x-for="p in products" :key="p.id">
+                <article class="pos-product" :class="{ 'is-in-cart': cartQty(p.id) > 0 }">
+                  <span class="pos-product-quantity" x-show="cartQty(p.id) > 0" x-text="cartQty(p.id)"
+                    :aria-label="cartQty(p.id) + ' in order'"></span>
+                  <div class="pos-product-image"><img :src="productImage(p)" :alt="p.name" width="220" height="220"
+                      loading="lazy" @error.once="$el.src = '/static/images/product-placeholder.svg'"></div>
+                  <div class="pos-product-bottom">
+                    <div class="pos-product-copy">
+                      <h2 x-text="p.name"></h2>
+                      <p x-text="formatMoney(p.price)"></p>
+                    </div>
+                    <button type="button" class="pos-add-button" @click="addToCart(p)" :disabled="loading"
+                      :aria-label="'Add ' + p.name + ' to order'">{{ icon('plus') }}</button>
+                  </div>
+                </article>
+              </template>
+            </div>
+          </section>
+
+          <aside class="pos-order" aria-label="Current order">
+            <div class="pos-order-type" role="group" aria-label="Order type">
+              <button type="button" @click="orderType = 'dine_in'" :class="{ 'is-active': orderType === 'dine_in' }"
+                :aria-pressed="orderType === 'dine_in'">Dine In</button>
+              <button type="button" @click="orderType = 'take_away'" :class="{ 'is-active': orderType === 'take_away' }"
+                :aria-pressed="orderType === 'take_away'">Take Away</button>
+            </div>
+
+            <div class="pos-customer-fields" :class="{ 'is-takeaway': orderType === 'take_away' }">
+              <div>
+                <label for="customer-name">Customer Name</label>
+                <input id="customer-name" type="text" maxlength="50" x-model="customerName" placeholder="Walk-in"
+                  autocomplete="off">
+              </div>
+              <div x-show="orderType === 'dine_in'">
+                <label for="table-number">Table</label>
+                <input id="table-number" type="text" maxlength="10" x-model="tableNumber" placeholder="A1"
+                  autocomplete="off">
+              </div>
+            </div>
+
+            <div class="pos-order-list-heading">
+              <h3>Order List</h3>
+              <span x-text="totalCartItems() + (totalCartItems() === 1 ? ' Item' : ' Items')" aria-live="polite"></span>
+            </div>
+
+            <div class="pos-order-body">
+              <div x-show="cart.length === 0" class="pos-order-empty">
+                {{ icon('coffee') }}
+                <p>No items yet</p>
+                <span>Tap + on a menu item to add it</span>
+              </div>
+              <ul x-show="cart.length > 0" class="pos-cart-list">
+                <template x-for="(item, idx) in cart" :key="item.product_id">
+                  <li class="pos-cart-item">
+                    <div class="pos-cart-thumbnail"><img :src="productImage(item)" :alt="item.name" width="52"
+                        height="60" @error.once="$el.src = '/static/images/product-placeholder.svg'"></div>
+                    <div class="pos-cart-item-content">
+                      <div class="pos-cart-item-top">
+                        <h4 x-text="item.name"></h4><span x-text="formatMoney(item.price * item.quantity)"></span>
+                      </div>
+                      <p class="pos-cart-item-price"><span
+                          x-text="formatMoney(item.price) + ' × ' + item.quantity"></span>
+                      </p>
+                      <div class="pos-cart-item-controls">
+                        <label class="pos-item-note">{{ icon('note') }}<input type="text" maxlength="200"
+                            x-model="item.notes" :disabled="loading" placeholder="Add a note…"
+                            :aria-label="'Note for ' + item.name"></label>
+                        <div class="pos-quantity-controls">
+                          <button type="button" @click="changeQty(idx, -1)" :disabled="loading"
+                            :aria-label="'Remove one ' + item.name">{{ icon('minus') }}</button>
+                          <span x-text="item.quantity"></span>
+                          <button type="button" @click="changeQty(idx, 1)" :disabled="loading"
+                            :aria-label="'Add one ' + item.name">{{ icon('plus') }}</button>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                </template>
+              </ul>
+            </div>
+
+            <section class="pos-payment" aria-labelledby="payment-heading">
+              <h3 id="payment-heading">Payment Details</h3>
+              <div class="pos-payment-methods" role="group" aria-label="Payment method">
+                <template x-for="pm in ['qris', 'cash', 'debit']" :key="pm">
+                  <button type="button" @click="paymentMethod = pm" :class="{ 'is-active': paymentMethod === pm }"
+                    :aria-pressed="paymentMethod === pm" x-text="pm"></button>
+                </template>
+              </div>
+              <div x-show="paymentMethod === 'cash'" x-cloak class="pos-cash-fields">
+                <div><label for="cash-tendered">Cash tendered</label><input id="cash-tendered" type="number" step="0.01"
+                    min="0" x-model="amountPaid" :placeholder="cartTotal().toFixed(2)"></div>
+                <div><span>Change</span><strong x-text="formatMoney(cashChange())"></strong></div>
+              </div>
+              <dl class="pos-totals">
+                <div>
+                  <dt>Subtotal</dt>
+                  <dd x-text="formatMoney(cartSubtotal())"></dd>
+                </div>
+                <div>
+                  <dt>Tax <span>10%</span></dt>
+                  <dd x-text="formatMoney(cartTax())"></dd>
+                </div>
+                <div class="pos-grand-total">
+                  <dt>Total</dt>
+                  <dd x-text="formatMoney(cartTotal())"></dd>
+                </div>
+              </dl>
+              <button type="button" class="pos-checkout pos-primary" @click="checkout()"
+                :disabled="cart.length === 0 || loading">
+                <span x-text="loading ? 'Processing…' : 'Place Order'"></span>
+                <span class="pos-checkout-total"><span x-text="formatMoney(cartTotal())"></span>{{ icon('chevron')
+                  }}</span>
+              </button>
+            </section>
+          </aside>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: QRIS PAYMENT SIMULATION (5s TIMEOUT + CLICKABLE QR LINK) -->
+  <div x-show="qrisModal" x-cloak class="adm-overlay no-print" @click.self="cancelQrisCheckout()" role="dialog" aria-modal="true" aria-labelledby="pos-qris-title">
+    <section class="adm-modal pos-qris-modal">
+      <div class="adm-modal-head">
+        <div>
+          <h2 id="pos-qris-title">QRIS Payment</h2>
+          <p class="adm-cell-sub adm-mono">Shika Coffee · NMID ID1026SHIKA</p>
+        </div>
+        <button type="button" class="adm-btn is-ghost is-icon" @click="cancelQrisCheckout()" aria-label="Close QRIS modal">
+          <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-close"></use></svg>
+        </button>
+      </div>
+
+      <div class="qris-pay-amount-box" style="margin-bottom:14px;">
+        <span class="qris-pay-label">Amount Due</span>
+        <strong class="qris-pay-amount adm-mono" x-text="formatMoney(qrisModal?.amount || 0)"></strong>
+        <span class="qris-pay-meta">
+          <span x-text="qrisModal?.customer_name || 'Walk-in'"></span>
+          <span aria-hidden="true"> · </span>
+          <span class="adm-mono" x-text="qrisModal?.session_id || ''"></span>
+        </span>
+      </div>
+
+      <div x-show="qrisModal?.status === 'pending'">
+        <div class="pos-qris-qr-card">
+          <div class="pos-qris-svg-frame" x-html="qrisModal?.qr_svg || ''"></div>
+          <span class="pos-qris-qr-caption">Scan QR code to pay</span>
+        </div>
+
+        <div class="qris-timer-row">
+          <span>QR expires in</span>
+          <strong class="adm-mono" :class="{ 'is-urgent': qrisRemaining <= 30 }" x-text="formatCountdown(qrisRemaining)"></strong>
+        </div>
+        <div class="qris-progress-track" aria-hidden="true">
+          <span class="qris-progress-fill" :style="'width:' + qrisProgressPct() + '%'"></span>
+        </div>
+
+        <p class="pos-qris-waiting">Waiting for QRIS payment confirmation...</p>
+
+        <div class="adm-modal-foot">
+          <button type="button" class="adm-btn" @click="cancelQrisCheckout()">Cancel</button>
+        </div>
+      </div>
+
+      <div class="qris-pay-state is-success" x-show="qrisModal?.status === 'paid'" x-cloak role="status">
+        <div class="qris-state-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <h3>QRIS Payment Received</h3>
+        <p>Finalizing order and generating receipt...</p>
+      </div>
+
+      <div class="qris-pay-state is-expired" x-show="qrisModal?.status === 'expired'" x-cloak role="alert">
+        <div class="qris-state-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        </div>
+        <h3>QRIS Timed Out (5 min)</h3>
+        <p>No payment was received before the QR code expired.</p>
+        <div class="adm-modal-foot" style="justify-content:center; margin-top:14px;">
+          <button type="button" class="adm-btn" @click="cancelQrisCheckout()">Cancel</button>
+          <button type="button" class="adm-btn is-primary" @click="retryQrisCheckout()" :disabled="loading">Generate New QR</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ANIMATED QRIS PAID NOTIFICATION POPUP -->
+  <div
+    x-show="qrisNotif.show"
+    x-cloak
+    x-transition:enter="adm-print-enter"
+    x-transition:enter-start="adm-print-enter-start"
+    x-transition:enter-end="adm-print-enter-end"
+    x-transition:leave="adm-print-leave"
+    x-transition:leave-start="adm-print-leave-start"
+    x-transition:leave-end="adm-print-leave-end"
+    class="adm-print-popup is-qris-paid no-print"
+    role="status"
+    aria-live="polite"
+  >
+    <span class="adm-print-icon" aria-hidden="true">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><use href="#adm-i-check"></use></svg>
+    </span>
+    <div class="adm-print-copy">
+      <span>QRIS Paid</span>
+      <span class="adm-print-sep" aria-hidden="true">·</span>
+      <span class="adm-mono adm-print-inv" x-text="formatMoney(qrisNotif.amount)"></span>
+      <span class="adm-print-sep" aria-hidden="true">·</span>
+      <span x-text="qrisNotif.customer"></span>
+    </div>
+    <button type="button" class="adm-print-close" @click="qrisNotif.show = false" aria-label="Dismiss QRIS notification">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#adm-i-close"></use></svg>
+    </button>
+  </div>
+
+  {{ adm_receipt_modal('New order', True) }}
+  {{ adm_profile_modal() }}
+  {{ adm_print_popup() }}
+</div>
+{% endblock %}

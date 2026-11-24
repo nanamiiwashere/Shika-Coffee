@@ -1,0 +1,115 @@
+{% macro auth_icon(name) -%}
+<svg class="pos-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#auth-icon-{{ name }}"></use></svg>
+{%- endmacro %}
+{% macro provider_logo(provider) -%}
+  {% if provider == 'google' %}
+  <svg class="pos-auth-provider-logo" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path fill="#4285F4" d="M43.61 24.46c0-1.36-.12-2.66-.35-3.92H24v7.42h11a9.4 9.4 0 0 1-4.08 6.18v5.14h6.61c3.87-3.56 6.08-8.8 6.08-14.82Z"/><path fill="#34A853" d="M24 44c5.51 0 10.13-1.83 13.51-4.96l-6.61-5.14c-1.83 1.23-4.18 1.96-6.9 1.96-5.32 0-9.83-3.59-11.44-8.42H5.73v5.3A20 20 0 0 0 24 44Z"/><path fill="#FBBC05" d="M12.56 27.44a12 12 0 0 1 0-6.88v-5.3H5.73a20 20 0 0 0 0 17.48l6.83-5.3Z"/><path fill="#EA4335" d="M24 12.14c3 0 5.69 1.03 7.81 3.04l5.86-5.86A19.62 19.62 0 0 0 24 4 20 20 0 0 0 5.73 15.26l6.83 5.3c1.61-4.83 6.12-8.42 11.44-8.42Z"/></svg>
+  {% else %}
+  <svg class="pos-auth-provider-logo" viewBox="0 0 127.14 96.36" aria-hidden="true" focusable="false"><path fill="#5865F2" d="M107.7 8.07A105.15 105.15 0 0 0 81.47 0a72.06 72.06 0 0 0-3.36 6.83 97.68 97.68 0 0 0-29.11 0A72.37 72.37 0 0 0 45.64 0 105.89 105.89 0 0 0 19.39 8.09C2.79 32.65-1.71 56.6.54 80.21a105.73 105.73 0 0 0 32.17 16.15 77.7 77.7 0 0 0 6.89-11.11 68.42 68.42 0 0 1-10.85-5.18c.91-.66 1.8-1.35 2.66-2.06a75.57 75.57 0 0 0 64.32 0c.87.71 1.76 1.4 2.66 2.06a68.68 68.68 0 0 1-10.87 5.19 77.02 77.02 0 0 0 6.89 11.1 105.25 105.25 0 0 0 32.19-16.14c2.64-27.37-4.51-51.1-18.9-72.15ZM42.45 65.69c-6.27 0-11.42-5.75-11.42-12.82s5.04-12.83 11.42-12.83 11.53 5.8 11.42 12.83-5.04 12.82-11.42 12.82Zm42.24 0c-6.28 0-11.42-5.75-11.42-12.82s5.03-12.83 11.42-12.83 11.53 5.8 11.42 12.83-5.03 12.82-11.42 12.82Z"/></svg>
+  {% endif %}
+{%- endmacro %}
+{% set is_signup = (auth_mode == 'register') %}
+
+<svg class="pos-svg-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+  <symbol id="auth-icon-coffee" viewBox="0 0 24 24"><path d="M4 8h13v8a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Zm13 1h2a3 3 0 0 1 0 6h-2M7 3v2m4-3v3m4-2v2"/></symbol>
+  <symbol id="auth-icon-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+  <symbol id="auth-icon-people" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 4v3"/></symbol>
+</defs></svg>
+
+<section class="pos-login no-print" aria-labelledby="login-heading">
+  <div class="pos-auth-topline">
+    <a href="/" class="pos-login-back"><span aria-hidden="true">←</span> Back to Shika Coffee</a>
+  </div>
+
+  <div class="pos-login-card">
+    <div class="pos-auth-visual">
+      <img class="pos-auth-photo" src="{{ url_for('static', path='images/menu/cappuccino.jpg') }}" alt="" width="720" height="720" fetchpriority="high">
+      <div class="pos-auth-visual-top">
+        <span class="pos-auth-visual-label">Rooted in care.<br>Brewed with love.</span>
+      </div>
+      <div class="pos-auth-visual-copy">
+        <h2>Good coffee.<br><span>Even better days.</span></h2>
+        <div class="pos-auth-visual-footer">{{ auth_icon('coffee') }} <span>Slow drip. Thoughtful service.</span></div>
+      </div>
+    </div>
+
+    <div class="pos-auth-panel">
+      <div class="pos-auth-panel-inner">
+        <header class="pos-auth-heading">
+          <h1 id="login-heading" tabindex="-1">{{ 'Join the team.' if is_signup else 'Welcome back.' }}</h1>
+          <p class="pos-login-copy">{{ 'Good days begin with a great team. Create your staff account to get started.' if is_signup else 'A fresh start, a familiar place. Sign in to make someone’s day a little better.' }}</p>
+        </header>
+
+        <div class="pos-auth-feedback" x-show="authError || authMessage" x-cloak>
+          <p id="auth-error" class="pos-auth-error" role="alert" aria-atomic="true" x-show="authError" x-text="authError"></p>
+          <p id="auth-message" class="pos-auth-message" role="status" aria-live="polite" aria-atomic="true" x-show="authMessage" x-text="authMessage"></p>
+        </div>
+
+        {% if not is_signup %}
+        <form id="login-form" @submit.prevent="login()" class="pos-login-form" aria-labelledby="login-heading" :aria-describedby="authError ? 'auth-error' : (authMessage ? 'auth-message' : null)" :aria-busy="loading || !!oauthLoading">
+          <fieldset class="pos-auth-fields" :disabled="loading || !!oauthLoading">
+            <legend class="pos-auth-sr-only">Sign in to your staff account</legend>
+            <div class="pos-auth-field">
+              <label for="login-identifier">Username or email</label>
+              <input id="login-identifier" name="identifier" type="text" x-model="loginForm.identifier" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Your username or email">
+            </div>
+            <div class="pos-auth-field">
+              <label for="login-password">Password</label>
+              <div class="pos-auth-password">
+                <input id="login-password" name="password" type="password" :type="showPassword ? 'text' : 'password'" x-model="loginForm.password" required maxlength="128" autocomplete="current-password" placeholder="Enter your password">
+                <button type="button" class="pos-auth-password-toggle" @click="showPassword = !showPassword" :aria-label="showPassword ? 'Hide password' : 'Show password'" :aria-pressed="showPassword" aria-controls="login-password" x-text="showPassword ? 'Hide' : 'Show'">Show</button>
+              </div>
+            </div>
+            <button type="submit" class="pos-primary pos-auth-submit" :disabled="loading || !!oauthLoading"><span x-show="loading" class="pos-spinner" aria-hidden="true"></span><span x-text="loading ? 'Signing in…' : 'Sign in to workspace'">Sign in to workspace</span>{{ auth_icon('arrow') }}</button>
+          </fieldset>
+        </form>
+        {% else %}
+        <form id="register-form" @submit.prevent="register()" class="pos-login-form" aria-labelledby="login-heading" aria-describedby="auth-approval-note" :aria-busy="loading || !!oauthLoading">
+          <fieldset class="pos-auth-fields" :disabled="loading || !!oauthLoading">
+            <legend class="pos-auth-sr-only">Create your staff account</legend>
+            <div class="pos-auth-field">
+              <label for="register-full-name">Full name</label>
+              <input id="register-full-name" name="full_name" type="text" x-model="registerForm.full_name" required maxlength="100" autocomplete="name" placeholder="Your full name">
+            </div>
+            <div class="pos-auth-field">
+              <label for="register-email">Email address</label>
+              <input id="register-email" name="email" type="email" x-model="registerForm.email" required maxlength="150" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com">
+            </div>
+            <div class="pos-auth-field">
+              <label for="register-username">Username</label>
+              <input id="register-username" name="username" type="text" x-model="registerForm.username" required maxlength="50" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Choose a username">
+            </div>
+            <div class="pos-auth-password-grid">
+              <div class="pos-auth-field">
+                <label for="register-password">Password</label>
+                <div class="pos-auth-password">
+                  <input id="register-password" name="password" type="password" :type="showPassword ? 'text' : 'password'" x-model="registerForm.password" required minlength="8" maxlength="128" autocomplete="new-password" aria-describedby="register-password-hint" placeholder="8+ characters">
+                  <button type="button" class="pos-auth-password-toggle" @click="showPassword = !showPassword" :aria-label="showPassword ? 'Hide new password' : 'Show new password'" :aria-pressed="showPassword" aria-controls="register-password" x-text="showPassword ? 'Hide' : 'Show'">Show</button>
+                </div>
+              </div>
+              <div class="pos-auth-field">
+                <label for="register-confirm-password">Confirm password</label>
+                <div class="pos-auth-password">
+                  <input id="register-confirm-password" name="confirm_password" type="password" :type="showConfirmPassword ? 'text' : 'password'" x-model="registerForm.confirm_password" required minlength="8" maxlength="128" autocomplete="new-password" aria-describedby="register-password-hint" placeholder="Repeat password">
+                  <button type="button" class="pos-auth-password-toggle" @click="showConfirmPassword = !showConfirmPassword" :aria-label="showConfirmPassword ? 'Hide confirmation password' : 'Show confirmation password'" :aria-pressed="showConfirmPassword" aria-controls="register-confirm-password" x-text="showConfirmPassword ? 'Hide' : 'Show'">Show</button>
+                </div>
+              </div>
+            </div>
+            <p id="register-password-hint" class="pos-auth-hint">Use at least 8 characters and enter the same password twice.</p>
+            <button type="submit" class="pos-primary pos-auth-submit" :disabled="loading || !!oauthLoading"><span x-show="loading" class="pos-spinner" aria-hidden="true"></span><span x-text="loading ? 'Creating account…' : 'Create staff account'">Create staff account</span>{{ auth_icon('arrow') }}</button>
+          </fieldset>
+        </form>
+        {% endif %}
+
+        <div class="pos-auth-divider"><span>or continue with</span></div>
+        <div class="pos-auth-socials" role="group" aria-label="Continue with a social account">
+          <button type="button" class="pos-auth-social" @click="startOAuth('google')" :disabled="loading || !!oauthLoading" :aria-busy="oauthLoading === 'google'" aria-label="Continue with Google">{{ provider_logo('google') }}<span x-text="oauthLoading === 'google' ? 'Connecting…' : 'Google'">Google</span></button>
+          <button type="button" class="pos-auth-social" @click="startOAuth('discord')" :disabled="loading || !!oauthLoading" :aria-busy="oauthLoading === 'discord'" aria-label="Continue with Discord">{{ provider_logo('discord') }}<span x-text="oauthLoading === 'discord' ? 'Connecting…' : 'Discord'">Discord</span></button>
+        </div>
+
+        <p class="pos-auth-switch">{{ 'Already part of the team?' if is_signup else 'New to the team?' }} <a href="{{ '/login' if is_signup else '/signup' }}">{{ 'Sign in' if is_signup else 'Create an account' }}</a></p>
+        <aside id="auth-approval-note" class="pos-auth-approval">{{ auth_icon('people') }}<p>New staff accounts are <strong>inactive cashiers</strong> until an admin approves access. This also applies to first-time Google or Discord sign-ups.</p></aside>
+      </div>
+    </div>
+  </div>
+</section>

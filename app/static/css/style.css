@@ -1,0 +1,26 @@
+/* Custom Shika Coffee styles */
+body { margin: 0; background-color: #F7F5ED; }
+[x-cloak] { display: none !important; }
+
+/* Hide scrollbar chrome while keeping smooth wheel/touch/keyboard scrolling */
+html,
+body,
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+@media print {
+  body { background: #fff !important; }
+  .no-print { display: none !important; }
+  .print-receipt-overlay { position: static !important; background: transparent !important; padding: 0 !important; }
+  .print-receipt-card { box-shadow: none !important; max-width: 100% !important; }
+}

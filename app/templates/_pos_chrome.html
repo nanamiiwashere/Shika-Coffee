@@ -1,0 +1,111 @@
+{% macro icon(name, class='') -%}
+<svg class="pos-icon {{ class }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#pos-icon-{{ name }}"></use></svg>
+{%- endmacro %}
+
+{% macro svg_defs() -%}
+<svg class="pos-svg-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+  <symbol id="pos-icon-menu" viewBox="0 0 24 24"><path d="M5 9h14M5 15h14"/></symbol>
+  <symbol id="pos-icon-calendar" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4m8-4v4M4 10h16"/></symbol>
+  <symbol id="pos-icon-register" viewBox="0 0 24 24"><path d="M4 14h16l1 6H3l1-6Zm2-4h12v4H6v-4Zm3-5h6v3H9V5Zm-1 12h2m4 0h4"/></symbol>
+  <symbol id="pos-icon-orders" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 9h6m-6 4h6m-6 4h4"/></symbol>
+  <symbol id="pos-icon-ticket" viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5-2 1.5V3Z" fill="currentColor" stroke="none"/><path d="M9 8h6M9 11.5h6M9 15h4" stroke="var(--pos-card-bg, #ffffff)" stroke-width="1.4"/></symbol>
+  <symbol id="pos-icon-beans" viewBox="0 0 24 24"><ellipse cx="8.4" cy="11.2" rx="4.2" ry="6.7" transform="rotate(-16 8.4 11.2)" fill="currentColor" stroke="none"/><path d="M7.3 5.2c1.7 3.7-1.1 7.6.9 12" stroke="var(--pos-card-bg, #165632)" stroke-width="1.35"/><ellipse cx="16.1" cy="12.5" rx="4.2" ry="6.7" transform="rotate(14 16.1 12.5)" fill="currentColor" stroke="none"/><path d="M16.9 6.5c-1.5 3.7 1.1 7.6-.9 12" stroke="var(--pos-card-bg, #165632)" stroke-width="1.35"/></symbol>
+  <symbol id="pos-icon-tea" viewBox="0 0 24 24"><path d="M4 10h13v3.5a6.5 6.5 0 0 1-6.5 6.5h0A6.5 6.5 0 0 1 4 13.5V10Z" fill="currentColor" stroke="none"/><path d="M17 11.2h1.6a2.3 2.3 0 0 1 0 4.6H17" stroke="currentColor" stroke-width="1.7"/><path d="M2.5 21h16M8.5 3.5c-1 1.4 1 2.2 0 3.6m3.5-3.6c-1 1.4 1 2.2 0 3.6m3.5-3.6c-1 1.4 1 2.2 0 3.6" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 10v3.8h3V10" stroke="var(--pos-card-bg, #ffffff)" stroke-width="1.3"/></symbol>
+  <symbol id="pos-icon-croissant" viewBox="0 0 24 24"><path d="M4.3 16.6c-1.2-2-.6-5 1.9-6.6 1.9-1.3 4.4-1.4 6.4-.2 2.2-1 4.8-.6 6.4 1.1 1.7 1.8 1.9 4.5.5 6.3-1.2 1.5-3.4 1.7-5 .6-1.7.8-3.8.8-5.4 0-1.6 1-3.8.6-4.8-1.2Z" fill="currentColor" stroke="none"/><path d="M9.1 9.5 7.7 16m3.9-6.8v7.6m3.8-7.1 1.4 6.4" stroke="var(--pos-card-bg, #ffffff)" stroke-width="1.4"/></symbol>
+  <symbol id="pos-icon-bag" viewBox="0 0 24 24"><path d="M9 9V7a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="1.6"/><path d="M5 8.5h14L18 21H6L5 8.5Z" fill="currentColor" stroke="none"/><path d="M9 13.5h6" stroke="var(--pos-card-bg, #ffffff)" stroke-width="1.4"/></symbol>
+  <symbol id="pos-icon-done" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="currentColor" stroke="none"/><path d="m8.2 12.3 2.6 2.6 5-5.4" stroke="var(--pos-card-bg, #ffffff)" stroke-width="1.7"/></symbol>
+  <symbol id="pos-icon-deer" viewBox="0 0 24 24"><path d="M5 12c0 4.2 3.1 7.5 7 7.5s7-3.3 7-7.5H5Zm14 .8h1.5a2 2 0 0 1 0 4H19M8.5 12 6.8 6.3m1.7 5.7-3-3.2m3 3.2.8-3.8M15.5 12l1.7-5.7m-1.7 5.7 3-3.2m-3 3.2-.8-3.8" stroke="currentColor" stroke-width="1.45"/><path d="M4 21h16" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="pos-icon-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="pos-icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+  <symbol id="pos-icon-command" viewBox="0 0 24 24"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3Z"/></symbol>
+  <symbol id="pos-icon-coffee" viewBox="0 0 24 24"><path d="M4 8h13v8a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Zm13 1h2a3 3 0 0 1 0 6h-2M7 3v2m4-3v3m4-2v2"/></symbol>
+  <symbol id="pos-icon-inventory" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v4H9zM9 11h1m3 0h3m-7 4h1m3 0h3"/></symbol>
+  <symbol id="pos-icon-chart" viewBox="0 0 24 24"><path d="M4 19h16M7 16v-5m5 5V7m5 9v-8"/></symbol>
+  <symbol id="pos-icon-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
+  <symbol id="pos-icon-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+  <symbol id="pos-icon-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+  <symbol id="pos-icon-arrow-left" viewBox="0 0 24 24"><path d="M20 12H4m6-6-6 6 6 6"/></symbol>
+  <symbol id="pos-icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="pos-icon-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="pos-icon-note" viewBox="0 0 24 24"><path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8m-8 4h5"/></symbol>
+  <symbol id="pos-icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+  <symbol id="pos-icon-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+  <symbol id="pos-icon-logout" viewBox="0 0 24 24"><path d="M9 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4m7-13 5 5-5 5M10 12h11"/></symbol>
+  <symbol id="pos-icon-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 20a7 7 0 0 1 14 0"/></symbol>
+</defs></svg>
+{%- endmacro %}
+
+{% macro toast() -%}
+<div x-show="toast.show" x-cloak class="pos-toast no-print" :class="{ 'is-error': toast.type === 'error' }" role="status" aria-live="polite"><span x-text="toast.message"></span><button type="button" @click="toast.show = false" aria-label="Dismiss notification">{{ icon('close') }}</button></div>
+{%- endmacro %}
+
+{% macro header(active_page) -%}
+<header class="pos-header{% if active_page in ('orders', 'inventory', 'dashboard') %} pos-header-wide{% endif %}">
+  <div class="pos-header-left">
+    <div class="pos-header-start">
+      <div class="pos-popover-anchor" @click.outside="menuOpen = false">
+        <button type="button" class="pos-menu-button" @click="menuOpen = !menuOpen; modeOpen = false; notificationsOpen = false" :aria-expanded="menuOpen" aria-controls="pos-nav-menu" aria-label="Open navigation menu">{{ icon('menu') }}</button>
+        <nav id="pos-nav-menu" x-show="menuOpen" x-cloak class="pos-popover pos-nav-popover" aria-label="Workspace navigation">
+          <a href="/pos" {% if active_page in ('pos', 'orders') %}class="is-current"{% endif %}>{{ icon('register') }} Barista</a>
+          <a href="/dashboard" x-show="user && ['admin', 'manager'].includes(user.role)" {% if active_page == 'dashboard' %}class="is-current"{% endif %}>{{ icon('chart') }} Dashboard & Reports</a>
+          <a href="/">{{ icon('coffee') }} Shika Home</a>
+        </nav>
+      </div>
+      <div class="pos-date-pill">
+        {{ icon('calendar') }}
+        <time class="pos-date" x-text="todayFormatted"></time>
+      </div>
+    </div>
+
+    <div class="pos-header-center">
+      <div class="pos-popover-anchor" @click.outside="modeOpen = false">
+        {% if active_page in ('pos', 'orders') %}
+        <button type="button" class="pos-mode-pill" @click="modeOpen = !modeOpen; menuOpen = false; notificationsOpen = false" :aria-expanded="modeOpen" aria-controls="pos-mode-menu">
+          {{ icon('orders' if active_page == 'orders' else 'register') }}
+          <span>{{ 'Bar Orders' if active_page == 'orders' else 'POS System' }}</span>
+          {{ icon('chevron-down', 'pos-mode-chevron') }}
+        </button>
+        <div id="pos-mode-menu" x-show="modeOpen" x-cloak class="pos-popover pos-nav-popover pos-mode-popover" role="menu">
+          <a href="/pos" {% if active_page == 'pos' %}class="is-current"{% endif %} role="menuitem">{{ icon('register') }} POS System</a>
+          <a href="/pos/orders" {% if active_page == 'orders' %}class="is-current"{% endif %} role="menuitem">{{ icon('orders') }} Bar Orders</a>
+        </div>
+        {% else %}
+        <button type="button" class="pos-mode-pill" @click="modeOpen = !modeOpen; menuOpen = false; notificationsOpen = false" :aria-expanded="modeOpen" aria-controls="pos-backoffice-menu">
+          {{ icon('chart' if active_page == 'dashboard' else 'inventory') }}
+          <span>{{ 'Management' if active_page == 'dashboard' else 'Warehouse' }}</span>
+          {{ icon('chevron-down', 'pos-mode-chevron') }}
+        </button>
+        <div id="pos-backoffice-menu" x-show="modeOpen" x-cloak class="pos-popover pos-nav-popover pos-mode-popover" role="menu">
+          <a href="/dashboard" x-show="user && ['admin', 'manager'].includes(user.role)" {% if active_page == 'dashboard' %}class="is-current"{% endif %} role="menuitem">{{ icon('chart') }} Management</a>
+          <a href="/pos" role="menuitem">{{ icon('register') }} Barista POS</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="pos-header-actions">
+    <div class="pos-popover-anchor" @click.outside="notificationsOpen = false">
+      <button type="button" class="pos-icon-button pos-notifications-button" @click="notificationsOpen = !notificationsOpen; menuOpen = false; modeOpen = false" :aria-expanded="notificationsOpen" aria-controls="pos-notifications" aria-label="Stock notifications">{{ icon('bell') }}<span class="pos-notification-dot" x-show="lowStockItems.length > 0"></span></button>
+      <section id="pos-notifications" x-show="notificationsOpen" x-cloak class="pos-popover" aria-labelledby="pos-notifications-title">
+        <div class="pos-popover-heading"><h2 id="pos-notifications-title">Stock updates</h2><span x-text="lowStockItems.length"></span></div>
+        <p x-show="lowStockItems.length === 0" class="pos-popover-empty">All good. No low-stock alerts.</p>
+        <ul class="pos-stock-list"><template x-for="material in lowStockItems" :key="material.id"><li><span x-text="material.name"></span><small x-text="Number(material.current_stock) + ' ' + material.unit_symbol + ' left'"></small></li></template></ul>
+        <a href="/dashboard?tab=roastery" x-show="isManager()" class="pos-popover-link">Open Roastery &amp; Beans {{ icon('arrow') }}</a>
+      </section>
+    </div>
+
+    <div class="pos-user-pill">
+      <span class="pos-avatar" aria-hidden="true">
+        <template x-if="user?.avatar_url"><img :src="user.avatar_url" alt="" width="34" height="34" @error="$el.hidden = true"></template>
+        {{ icon('user') }}
+      </span>
+      <div class="pos-user-meta">
+        <strong x-text="user?.full_name || 'Staff'"></strong>
+        <small x-text="user?.role || 'cashier'"></small>
+      </div>
+      <button type="button" class="pos-logout-icon" @click="logout()" aria-label="Sign out" title="Sign out">{{ icon('logout') }}</button>
+    </div>
+  </div>
+</header>
+{%- endmacro %}

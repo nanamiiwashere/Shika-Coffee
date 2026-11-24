@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Shika Coffee{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}?v=20261124a">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cream: '#F7F5ED',
+            shika: { green: '#0C5830', dark: '#083E23', lime: '#CCE36B', soft: '#E7E4D8' }
+          },
+          fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'], serif: ['Fraunces', 'serif'] }
+        }
+      }
+    }
+  </script>
+  {% block head %}{% endblock %}
+</head>
+
+<body class="bg-cream text-stone-800 font-sans antialiased selection:bg-shika-green selection:text-white">
+  {% block content %}{% endblock %}
+  <script src="{{ url_for('static', path='js/app.js') }}?v=20261123l"></script>
+  {% block scripts %}{% endblock %}
+</body>
+
+</html>

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Shika Coffee: QRIS Payment{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', path='css/admin-theme.css') }}?v=20261123h">
+{% endblock %}
+{% block content %}
+<div class="adm-app qris-page" x-data="shikaQrisPayPage('{{ session_id }}')">
+  <main class="qris-pay-shell">
+    <section class="qris-pay-card" aria-labelledby="qris-pay-heading">
+      <div class="qris-pay-brand">
+        <span class="adm-brand-mark">
+          <img src="/static/images/shika-logo.png" alt="Shika Coffee" width="417" height="565">
+        </span>
+        <div>
+          <strong id="qris-pay-heading">Shika Coffee Roastery</strong>
+          <small class="adm-mono">QRIS Simulation · NMID ID1026SHIKA</small>
+        </div>
+      </div>
+
+      <p class="adm-empty" x-show="loading">Loading QRIS payment session...</p>
+
+      <div class="qris-pay-state is-error" x-show="!loading && error && !session" x-cloak role="alert">
+        <h2>Session Not Found</h2>
+        <p x-text="error"></p>
+      </div>
+
+      <template x-if="!loading && session">
+        <div>
+          <div class="qris-pay-amount-box">
+            <span class="qris-pay-label">Total Payment</span>
+            <strong class="qris-pay-amount adm-mono" x-text="formatMoney(session.amount)"></strong>
+            <span class="qris-pay-meta">
+              <span x-text="session.customer_name || 'Guest'"></span>
+              <span aria-hidden="true"> · </span>
+              <span class="adm-mono" x-text="session.session_id"></span>
+            </span>
+          </div>
+
+          <div x-show="session.status === 'pending'">
+            <div class="qris-timer-row">
+              <span>Time remaining</span>
+              <strong class="adm-mono" :class="{ 'is-urgent': remaining <= 30 }" x-text="formatCountdown(remaining)"></strong>
+            </div>
+            <div class="qris-progress-track" aria-hidden="true">
+              <span class="qris-progress-fill" :style="'width:' + progressPct() + '%'"></span>
+            </div>
+
+            <p class="adm-profile-error" x-show="error" x-text="error" role="alert"></p>
+
+            <button
+              type="button"
+              id="qris-pay-btn"
+              class="adm-btn is-primary qris-pay-cta"
+              @click="submitPay()"
+              :disabled="paying || remaining <= 0"
+            >
+              <span x-text="paying ? 'Processing QRIS...' : ('Pay ' + formatMoney(session.amount) + ' Now')"></span>
+            </button>
+            <p class="qris-pay-hint">Tap to simulate QRIS payment and notify the POS cashier instantly.</p>
+          </div>
+
+          <div class="qris-pay-state is-success" x-show="session.status === 'paid'" x-cloak role="status">
+            <div class="qris-state-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>
+            </div>
+            <h2>Payment Sent</h2>
+            <p>QRIS payment confirmed. The POS register has been notified.</p>
+          </div>
+
+          <div class="qris-pay-state is-expired" x-show="session.status === 'expired' || session.status === 'cancelled'" x-cloak role="alert">
+            <div class="qris-state-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </div>
+            <h2 x-text="session.status === 'cancelled' ? 'Payment Cancelled' : 'QRIS Session Expired'"></h2>
+            <p x-text="session.status === 'cancelled' ? 'This QRIS payment was cancelled at the register.' : 'The 5-minute QRIS window timed out. Ask the cashier to generate a new QR code.'"></p>
+          </div>
+        </div>
+      </template>
+    </section>
+  </main>
+</div>
+{% endblock %}

@@ -1,0 +1,412 @@
+{% extends "base.html" %}
+{% from "_pos_chrome.html" import icon, svg_defs, toast %}
+{% from "_adm_sidebar.html" import adm_svg_defs, adm_sidebar, adm_profile_modal, adm_receipt_modal, adm_print_popup %}
+{% block title %}Shika Coffee: Bar Orders{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', path='css/admin-theme.css') }}?v=20261123n">
+<link rel="stylesheet" href="{{ url_for('static', path='css/pos.css') }}?v=20261124a">
+{% endblock %}
+{% block content %}
+<div class="pos-app is-kds" x-data="shikaOrders()"
+  @keydown.window="if (( $event.metaKey || $event.ctrlKey ) && $event.key.toLowerCase() === 'k' && token && !detailsOrder && !receiptModal && !profileModalOpen) { $event.preventDefault(); $refs.orderSearch.focus(); }"
+  @keydown.escape.window="sidebarOpen = false; menuOpen = false; modeOpen = false; notificationsOpen = false; if (profileModalOpen) closeProfileSettings(); else if (receiptModal) receiptModal = null; else if (detailsOrder) closeDetails();">
+  {{ svg_defs() }}
+  {{ adm_svg_defs() }}
+  {{ toast() }}
+
+  <div x-show="token" x-cloak class="adm-shell no-print" :inert="detailsOrder !== null || profileModalOpen">
+    {{ adm_sidebar('orders') }}
+
+    <div class="adm-content-col">
+      <header class="adm-topbar">
+        <div class="adm-topbar-left">
+          <button type="button" class="adm-mobile-menu" @click="sidebarOpen = !sidebarOpen" :aria-expanded="sidebarOpen"
+            aria-label="Toggle navigation sidebar">
+            <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              aria-hidden="true">
+              <use href="#adm-i-menu"></use>
+            </svg>
+          </button>
+          <nav class="adm-breadcrumb" aria-label="Current location">
+            <span>Shika Roastery</span>
+            <span aria-hidden="true">/</span>
+            <strong>Bar Orders</strong>
+            <span aria-hidden="true">·</span>
+            <time class="adm-mono" style="font-size:12px; color:var(--muted-text);" x-text="todayKdsDate"></time>
+          </nav>
+        </div>
+
+        <div class="adm-topbar-right">
+          <button type="button" class="adm-btn" @click="loadOrders(false)" :disabled="ordersLoading">
+            <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              aria-hidden="true">
+              <use href="#adm-i-refresh"></use>
+            </svg>
+            <span x-text="ordersLoading ? 'Refreshing...' : 'Refresh'"></span>
+          </button>
+        </div>
+      </header>
+
+      <main class="pos-kds-main">
+        <h1 class="pos-auth-sr-only">Bar Orders Production Queue</h1>
+
+        <section class="pos-kds-toolbar" aria-label="Bar queue controls and filters">
+          <div class="pos-kds-toolbar-left">
+            <div class="pos-kds-seg" role="tablist" aria-label="Order view mode">
+              <button type="button" role="tab" class="pos-kds-seg-btn" :class="{ 'is-active': activeView === 'queue' }"
+                :aria-selected="activeView === 'queue'" @click="activeView = 'queue'">
+                <span>Bar Queue</span>
+                <span class="pos-kds-tab-count" x-text="queueCount()"></span>
+              </button>
+              <button type="button" role="tab" class="pos-kds-seg-btn"
+                :class="{ 'is-active': activeView === 'history', 'is-pulsing': historyTabPulse }" :aria-selected="activeView === 'history'"
+                @click="activeView = 'history'">
+                <span>Served History</span>
+                <span class="pos-kds-tab-count" x-text="historyCount()"></span>
+              </button>
+            </div>
+
+            <div class="pos-kds-seg is-cats" role="group" aria-label="Station category filters">
+              <button type="button" class="pos-kds-seg-btn" :class="{ 'is-active': activeCategory === null }"
+                :aria-pressed="activeCategory === null" @click="activeCategory = null">All Items</button>
+              <template x-for="cat in categories" :key="cat.id">
+                <button type="button" class="pos-kds-seg-btn"
+                  :class="{ 'is-active': Number(activeCategory) === Number(cat.id) }"
+                  :aria-pressed="Number(activeCategory) === Number(cat.id)" @click="activeCategory = Number(cat.id)"
+                  x-text="cat.name"></button>
+              </template>
+            </div>
+          </div>
+
+          <div class="pos-kds-toolbar-right">
+            <div class="pos-kds-seg" role="group" aria-label="Order type filter">
+              <button type="button" class="pos-kds-seg-btn" :class="{ 'is-active': orderTypeFilter === 'all' }"
+                :aria-pressed="orderTypeFilter === 'all'" @click="orderTypeFilter = 'all'">All</button>
+              <button type="button" class="pos-kds-seg-btn" :class="{ 'is-active': orderTypeFilter === 'dine_in' }"
+                :aria-pressed="orderTypeFilter === 'dine_in'" @click="orderTypeFilter = 'dine_in'">Dine In</button>
+              <button type="button" class="pos-kds-seg-btn" :class="{ 'is-active': orderTypeFilter === 'take_away' }"
+                :aria-pressed="orderTypeFilter === 'take_away'" @click="orderTypeFilter = 'take_away'">Takeaway</button>
+            </div>
+
+            <label class="pos-kds-search" for="kds-search">
+              {{ icon('search') }}
+              <input id="kds-search" x-ref="orderSearch" type="search" x-model="searchQuery"
+                placeholder="Search guest, table, or drink..." autocomplete="off">
+            </label>
+          </div>
+        </section>
+
+        <div class="pos-catalog-feedback" x-show="ordersLoading && orders.length === 0" role="status">
+          <span class="pos-spinner"></span>
+          <span>Loading today's bar tickets…</span>
+        </div>
+
+        <div class="pos-catalog-feedback" x-show="ordersError && !ordersLoading" x-cloak role="alert">
+          {{ icon('orders') }}
+          <h2>We couldn't load bar orders.</h2>
+          <p x-text="ordersError"></p>
+          <button type="button" class="pos-kds-btn is-complete" style="max-width:160px;" @click="loadOrders(false)">Try
+            again</button>
+        </div>
+
+        <section x-show="!ordersError && !(ordersLoading && orders.length === 0) && activeView === 'queue'"
+          class="pos-kds-board" aria-label="Barista production Kanban board">
+          <template x-for="col in queueColumns" :key="col.id">
+            <div class="pos-kds-col" :class="['is-' + col.id, { 'is-receiving': receivingColumn === col.id }]">
+              <header class="pos-kds-col-head">
+                <div class="pos-kds-col-title">
+                  <svg x-show="col.icon === 'clock'" class="pos-kds-col-svg is-queued" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 2" />
+                  </svg>
+                  <svg x-show="col.icon === 'flame'" class="pos-kds-col-svg is-brewing" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true">
+                    <path
+                      d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+                  </svg>
+                  <svg x-show="col.icon === 'check-circle'" class="pos-kds-col-svg is-ready" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="m9 12 2 2 4-4" />
+                  </svg>
+                  <h2 x-text="col.label"></h2>
+                  <span class="pos-kds-col-sub" x-text="col.subtitle"></span>
+                </div>
+                <span class="pos-kds-col-count" x-text="columnOrders(col.id).length"></span>
+              </header>
+
+              <div class="pos-kds-col-list" x-show="columnOrders(col.id).length > 0">
+                <template x-for="order in columnOrders(col.id)" :key="col.id + '-' + order.id">
+                  <article class="pos-kds-card"
+                    :class="{ 'is-leaving': Boolean(leavingOrderIds[order.id]), 'is-completing': leavingOrderIds[order.id] === 'served', 'is-entering': Boolean(enteringOrderIds[order.id]) }"
+                    :aria-label="ticketChannel(order) + ' ' + shortInvoice(order.invoice_number)">
+                    <div>
+                      <div class="pos-kds-card-top">
+                        <div class="pos-kds-card-id">
+                          <strong x-text="ticketChannel(order)"></strong>
+                          <span class="pos-kds-dot" aria-hidden="true">·</span>
+                          <span class="pos-mono" x-text="shortInvoice(order.invoice_number)"></span>
+                        </div>
+                        <time class="pos-kds-time" x-text="formatOrderTime(order.transaction_date)"></time>
+                      </div>
+
+                      <p class="pos-kds-sub">
+                        <span x-text="ticketGuest(order)"></span>
+                        <span aria-hidden="true"> · </span>
+                        <span x-text="itemCount(order) + (itemCount(order) === 1 ? ' item' : ' items')"></span>
+                      </p>
+                    </div>
+
+                    <hr class="pos-kds-divider">
+
+                    <ul class="pos-kds-items">
+                      <template x-for="it in order.items || []" :key="it.id">
+                        <li class="pos-kds-item">
+                          <span class="pos-kds-qty" x-text="it.quantity + '×'"></span>
+                          <div class="pos-kds-item-copy">
+                            <strong x-text="it.product_name"></strong>
+                            <small x-text="itemCategoryName(it)"></small>
+                          </div>
+                        </li>
+                      </template>
+                    </ul>
+
+                    <div class="pos-kds-notes" x-show="orderNotes(order).length > 0">
+                      <template x-for="(noteText, nIdx) in orderNotes(order)" :key="order.id + '-note-' + nIdx">
+                        <p class="pos-kds-note"><strong>Note:</strong> <span x-text="noteText"></span></p>
+                      </template>
+                    </div>
+
+                    <div class="pos-kds-card-footer">
+                      <button type="button" class="pos-kds-btn" :class="col.ctaStyle"
+                        :disabled="Boolean(leavingOrderIds[order.id])"
+                        @click="setOrderStage(order, col.nextStage)" x-text="col.ctaLabel"></button>
+                      <button type="button" class="pos-kds-btn is-details" @click="openDetails(order)">Details</button>
+                    </div>
+                  </article>
+                </template>
+              </div>
+
+              <p class="pos-kds-col-empty" x-show="columnOrders(col.id).length === 0"
+                x-text="searchQuery || activeCategory !== null || orderTypeFilter !== 'all' ? 'No matching tickets' : col.emptyText">
+              </p>
+            </div>
+          </template>
+        </section>
+
+        <section x-show="!ordersError && !(ordersLoading && orders.length === 0) && activeView === 'history'" x-cloak
+          class="pos-kds-history-panel" aria-label="Served orders history">
+          <div class="pos-ops-table-wrap" x-show="servedOrders().length > 0">
+            <table class="pos-kds-history-table">
+              <thead>
+                <tr>
+                  <th>Ticket</th>
+                  <th>Guest</th>
+                  <th>Drinks & Items</th>
+                  <th>Status</th>
+                  <th class="is-num">Total</th>
+                  <th class="is-num">Receipt</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="order in servedOrders()" :key="'served-' + order.id">
+                  <tr>
+                    <td>
+                      <strong class="pos-mono pos-kds-tbl-main" x-text="shortInvoice(order.invoice_number)"></strong>
+                      <span class="pos-mono pos-kds-tbl-sub" x-text="formatOrderTime(order.transaction_date)"></span>
+                    </td>
+                    <td>
+                      <strong class="pos-kds-tbl-main" x-text="ticketGuest(order)"></strong>
+                      <span class="pos-kds-tbl-sub" x-text="ticketChannel(order)"></span>
+                    </td>
+                    <td class="pos-kds-tbl-drinks" x-text="itemSummaryLine(order) || 'No items'"></td>
+                    <td>
+                      <span class="pos-kds-status-inline"
+                        :class="order.status === 'cancelled' ? 'is-cancelled' : 'is-served'">
+                        <svg x-show="order.status !== 'cancelled'" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                          stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <circle cx="12" cy="12" r="9" />
+                          <path d="m9 12 2 2 4-4" />
+                        </svg>
+                        <svg x-show="order.status === 'cancelled'" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                          stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <circle cx="12" cy="12" r="9" />
+                          <path d="m15 9-6 6m0-6 6 6" />
+                        </svg>
+                        <span x-text="order.status === 'cancelled' ? 'Cancelled' : 'Served'"></span>
+                      </span>
+                    </td>
+                    <td class="is-num">
+                      <strong class="pos-mono pos-kds-tbl-total" x-text="formatMoney(order.total_amount)"></strong>
+                    </td>
+                    <td class="is-num">
+                      <button type="button" class="pos-kds-view-btn" @click="openDetails(order)">View</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="pos-kds-col-empty" x-show="servedOrders().length === 0"
+            x-text="searchQuery || activeCategory !== null || orderTypeFilter !== 'all' ? 'No served or cancelled orders match those filters' : 'No served tickets yet today'">
+          </p>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div x-show="detailsOrder" x-cloak class="pos-receipt-overlay no-print" @click.self="closeDetails()"
+    role="dialog" aria-modal="true" aria-labelledby="kds-details-heading">
+    <section class="pos-kds-modal" tabindex="-1"
+      x-effect="if (detailsOrder) $nextTick(() => $el.focus())">
+      <div class="pos-kds-modal-head">
+        <div class="pos-kds-modal-title-wrap">
+          <span class="pos-kds-deer-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+              stroke-linejoin="round">
+              <use href="#pos-icon-deer"></use>
+            </svg>
+          </span>
+          <div>
+            <div class="pos-kds-modal-toprow">
+              <h2 id="kds-details-heading" class="pos-mono" x-text="shortInvoice(detailsOrder?.invoice_number)"></h2>
+              <span class="pos-kds-status-inline"
+                :class="{ 'is-served': ['ready', 'served'].includes(orderStage(detailsOrder)), 'is-cancelled': orderStage(detailsOrder) === 'cancelled' }">
+                <svg x-show="['queued', 'brewing'].includes(orderStage(detailsOrder))" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                  aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 2" />
+                </svg>
+                <svg x-show="['ready', 'served'].includes(orderStage(detailsOrder))" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                  aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="m9 12 2 2 4-4" />
+                </svg>
+                <svg x-show="orderStage(detailsOrder) === 'cancelled'" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                  aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="m15 9-6 6m0-6 6 6" />
+                </svg>
+                <span x-text="stageLabel(orderStage(detailsOrder))"></span>
+              </span>
+            </div>
+            <p class="pos-kds-modal-created">
+              <span>Created at</span>
+              <time class="pos-mono" x-text="formatOrderTime(detailsOrder?.transaction_date)"></time>
+              <span aria-hidden="true"> · </span>
+              <span x-text="ticketChannel(detailsOrder)"></span>
+            </p>
+          </div>
+        </div>
+        <button type="button" class="pos-kds-modal-close no-print" @click="closeDetails()"
+          aria-label="Close order details">{{ icon('close') }}</button>
+      </div>
+
+      <div class="pos-kds-modal-guest-block">
+        <div class="pos-kds-modal-guest-row">
+          <div>
+            <span class="pos-kds-field-label">Guest</span>
+            <strong class="pos-kds-guest-name" x-text="ticketGuest(detailsOrder)"></strong>
+          </div>
+          <span class="pos-kds-guest-badge" x-show="guestOrderCount(detailsOrder) >= 2">Frequent Guest</span>
+        </div>
+
+        <div class="pos-kds-info-card">
+          <div>
+            <strong class="pos-kds-info-title">Payment & Cashier</strong>
+            <span class="pos-kds-info-sub"
+              x-text="'Handled by ' + (detailsOrder?.cashier_name || 'Staff') + ' · ' + (detailsOrder?.order_type === 'take_away' ? 'Takeaway' : 'Dine In')"></span>
+          </div>
+          <strong class="pos-kds-info-accent"
+            x-text="String(detailsOrder?.payment_method || 'cash').toUpperCase()"></strong>
+        </div>
+      </div>
+
+      <div class="pos-kds-modal-breakdown">
+        <div class="pos-kds-breakdown-head">
+          <span>Item Breakdown</span>
+          <span x-text="itemCount(detailsOrder) + (itemCount(detailsOrder) === 1 ? ' item' : ' items')"></span>
+        </div>
+
+        <ul class="pos-kds-breakdown-list">
+          <template x-for="it in detailsOrder?.items || []" :key="'modal-it-' + it.id">
+            <li class="pos-kds-breakdown-item">
+              <div class="pos-kds-breakdown-row">
+                <strong x-text="it.product_name"></strong>
+                <span class="pos-mono pos-kds-breakdown-price" x-text="formatMoney(it.subtotal)"></span>
+              </div>
+              <p class="pos-kds-breakdown-meta">
+                <span class="pos-mono" x-text="it.quantity + ' × ' + formatMoney(it.unit_price)"></span>
+                <span aria-hidden="true"> · </span>
+                <span x-text="itemCategoryName(it)"></span>
+              </p>
+              <p class="pos-kds-note" x-show="it.notes && it.notes.trim()"><strong>Note:</strong> <span
+                  x-text="it.notes.trim()"></span></p>
+            </li>
+          </template>
+        </ul>
+
+        <div class="pos-kds-totals-block">
+          <div class="pos-kds-total-sub" x-show="Number(detailsOrder?.tax || 0) > 0">
+            <span>Subtotal</span>
+            <span class="pos-mono" x-text="formatMoney(detailsOrder?.subtotal)"></span>
+          </div>
+          <div class="pos-kds-total-sub" x-show="Number(detailsOrder?.tax || 0) > 0">
+            <span>Tax (10%)</span>
+            <span class="pos-mono" x-text="formatMoney(detailsOrder?.tax)"></span>
+          </div>
+          <div class="pos-kds-order-total">
+            <strong>Order Total</strong>
+            <strong class="pos-mono" x-text="formatMoney(detailsOrder?.total_amount)"></strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="pos-kds-modal-footer no-print">
+        <div class="pos-kds-modal-cta-row"
+          x-show="detailsOrder && detailsOrder.status !== 'cancelled' && orderStage(detailsOrder) !== 'served'">
+          <div x-show="isManager()" style="display:contents;">
+            <template x-if="detailsOrder && confirmCancelId !== detailsOrder.id">
+              <button type="button" class="pos-kds-btn is-surface" style="padding-inline:16px;"
+                @click="confirmCancelId = detailsOrder.id" :disabled="cancellingOrder">Cancel Order</button>
+            </template>
+            <template x-if="detailsOrder && confirmCancelId === detailsOrder.id">
+              <div class="pos-ops-actions">
+                <button type="button" class="pos-kds-btn is-danger" @click="cancelOrder(detailsOrder)"
+                  :disabled="cancellingOrder" x-text="cancellingOrder ? 'Cancelling…' : 'Confirm Void'"></button>
+                <button type="button" class="pos-kds-btn is-surface" style="padding-inline:12px;"
+                  @click="confirmCancelId = null" :disabled="cancellingOrder">Keep</button>
+              </div>
+            </template>
+          </div>
+          <button type="button" class="pos-kds-btn is-complete" style="flex:1;"
+            x-show="nextStageOf(orderStage(detailsOrder))"
+            @click="setOrderStage(detailsOrder, nextStageOf(orderStage(detailsOrder)))"
+            x-text="nextCtaLabel(orderStage(detailsOrder))"></button>
+        </div>
+
+        <button type="button" class="pos-kds-btn is-surface pos-kds-print-btn" @click="printDetailsReceipt()">
+          <svg class="pos-kds-hdr-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+            <rect x="6" y="14" width="12" height="8" />
+          </svg>
+          <span>Print Receipt</span>
+        </button>
+      </div>
+    </section>
+  </div>
+
+  {{ adm_receipt_modal() }}
+  {{ adm_profile_modal() }}
+  {{ adm_print_popup() }}
+</div>
+{% endblock %}

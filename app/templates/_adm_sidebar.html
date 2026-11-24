@@ -1,0 +1,550 @@
+{% macro adm_svg_defs() -%}
+<svg style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <symbol id="adm-i-grid" viewBox="0 0 24 24">
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </symbol>
+    <symbol id="adm-i-orders" viewBox="0 0 24 24">
+      <rect x="5" y="4" width="14" height="17" rx="2" />
+      <path d="M9 9h6m-6 4h6m-6 4h4" />
+    </symbol>
+    <symbol id="adm-i-history" viewBox="0 0 24 24">
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5m4-1v5l3 2" />
+    </symbol>
+    <symbol id="adm-i-book" viewBox="0 0 24 24">
+      <path
+        d="M4 5.5A2.5 2.5 0 0 1 6.5 3H12v17H6.5A2.5 2.5 0 0 0 4 22V5.5Zm16 0A2.5 2.5 0 0 0 17.5 3H12v17h5.5a2.5 2.5 0 0 1 2.5 2V5.5Z" />
+    </symbol>
+    <symbol id="adm-i-box" viewBox="0 0 24 24">
+      <path d="M12 3 4 7.5v9L12 21l8-4.5v-9L12 3Zm0 9 8-4.5M12 12 4 7.5M12 12v9" />
+    </symbol>
+    <symbol id="adm-i-users" viewBox="0 0 24 24">
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M3 20a6 6 0 0 1 12 0" />
+      <circle cx="17" cy="9" r="2.5" />
+      <path d="M16 14.5a4.5 4.5 0 0 1 5 4.5" />
+    </symbol>
+    <symbol id="adm-i-refresh" viewBox="0 0 24 24">
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+      <path d="M21 3v6h-6" />
+    </symbol>
+    <symbol id="adm-i-store" viewBox="0 0 24 24">
+      <path d="M4 10h16v10H4V10Zm-1 0 1.5-6h15L21 10M9 20v-6h6v6" />
+    </symbol>
+    <symbol id="adm-i-search" viewBox="0 0 24 24">
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m16 16 4.5 4.5" />
+    </symbol>
+    <symbol id="adm-i-menu" viewBox="0 0 24 24">
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </symbol>
+    <symbol id="adm-i-close" viewBox="0 0 24 24">
+      <path d="m6 6 12 12M6 18 18 6" />
+    </symbol>
+    <symbol id="adm-i-check" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" />
+      <path d="m9 12 2 2 4-4" />
+    </symbol>
+    <symbol id="adm-i-check-plain" viewBox="0 0 24 24">
+      <path d="m5 12 5 5L20 7" />
+    </symbol>
+    <symbol id="adm-i-clock" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </symbol>
+    <symbol id="adm-i-flame" viewBox="0 0 24 24">
+      <path
+        d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+    </symbol>
+    <symbol id="adm-i-xcircle" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" />
+      <path d="m15 9-6 6m0-6 6 6" />
+    </symbol>
+    <symbol id="adm-i-alert" viewBox="0 0 24 24">
+      <path d="M12 3 2.5 20h19L12 3Zm0 6v5m0 3.5h.01" />
+    </symbol>
+    <symbol id="adm-i-print" viewBox="0 0 24 24">
+      <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <rect x="6" y="14" width="12" height="8" />
+    </symbol>
+    <symbol id="adm-i-eye" viewBox="0 0 24 24">
+      <path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </symbol>
+    <symbol id="adm-i-trash" viewBox="0 0 24 24">
+      <path d="M4 7h16m-10 4v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+    </symbol>
+    <symbol id="adm-i-edit" viewBox="0 0 24 24">
+      <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z" />
+    </symbol>
+    <symbol id="adm-i-logout" viewBox="0 0 24 24">
+      <path d="M9 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4m7-13 5 5-5 5M10 12h11" />
+    </symbol>
+    <symbol id="adm-i-settings" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="3" />
+      <path
+        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.08a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.08a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+    </symbol>
+    <symbol id="adm-i-cup" viewBox="0 0 24 24">
+      <path d="M5 9h11v6a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V9Zm11 1.5h2a2.5 2.5 0 0 1 0 5h-2M8 4v2m4-3v3m4-2v2" />
+    </symbol>
+    <symbol id="adm-i-wrench" viewBox="0 0 24 24">
+      <path
+        d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z" />
+    </symbol>
+    <symbol id="adm-i-clipboard" viewBox="0 0 24 24">
+      <rect x="6" y="4" width="12" height="17" rx="2" />
+      <path d="M9 4V3h6v1M9 10h6m-6 4h6m-6 4h4" />
+    </symbol>
+    <symbol id="adm-i-bell" viewBox="0 0 24 24">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
+    </symbol>
+    <symbol id="adm-i-truck" viewBox="0 0 24 24">
+      <path d="M3 7h11v10H3V7Zm11 3h4l3 3v4h-7v-7Z" />
+      <circle cx="7.5" cy="17.5" r="2" />
+      <circle cx="17.5" cy="17.5" r="2" />
+    </symbol>
+    <symbol id="adm-i-chart" viewBox="0 0 24 24">
+      <path d="M4 19h16M7 16v-5m5 5V7m5 9v-8" />
+    </symbol>
+    <symbol id="adm-i-download" viewBox="0 0 24 24">
+      <path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+    </symbol>
+  </defs>
+</svg>
+{%- endmacro %}
+
+{% macro adm_sidebar(active_page) -%}
+<div class="adm-sidebar-backdrop" :class="{ 'is-open': sidebarOpen }" @click="sidebarOpen = false" aria-hidden="true">
+</div>
+
+<aside class="adm-sidebar" :class="{ 'is-open': sidebarOpen }" aria-label="Primary workspace navigation">
+  <a href="/" class="adm-brand" aria-label="Shika Coffee home">
+    <span class="adm-brand-mark">
+      <img src="/static/images/shika-logo.png" alt="Shika Coffee" width="417" height="565">
+    </span>
+    <div class="adm-brand-text">
+      <strong>Shika Coffee</strong>
+      <small>Back Office Workspace</small>
+    </div>
+  </a>
+
+  <nav class="adm-nav" aria-label="Workspace pages">
+    {% if active_page == 'dashboard' %}
+    <button type="button" class="adm-nav-item" :class="{ 'is-active': activeTab === 'overview' }"
+      :aria-current="activeTab === 'overview' ? 'page' : null" @click="selectTab('overview')">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <use href="#adm-i-grid"></use>
+      </svg>
+      <span>Overview</span>
+    </button>
+    {% else %}
+    <a href="/dashboard?tab=overview" class="adm-nav-item" x-show="isManager()">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <use href="#adm-i-grid"></use>
+      </svg>
+      <span>Overview</span>
+    </a>
+    {% endif %}
+
+    <a href="/pos" class="adm-nav-item{% if active_page == 'pos' %} is-active{% endif %}" {% if active_page=='pos' %}
+      aria-current="page" {% endif %}>
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <use href="#adm-i-store"></use>
+      </svg>
+      <span>POS System</span>
+    </a>
+
+    <a href="/pos/orders" class="adm-nav-item{% if active_page == 'orders' %} is-active{% endif %}" {% if
+      active_page=='orders' %} aria-current="page" {% endif %}>
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <use href="#adm-i-orders"></use>
+      </svg>
+      <span>Orders</span>
+      <span class="adm-nav-badge" x-show="liveQueueCount() > 0" x-text="liveQueueCount()"></span>
+    </a>
+
+    {% if active_page == 'dashboard' %}
+    <button type="button" class="adm-nav-item" :class="{ 'is-active': activeTab === 'sales' }"
+      :aria-current="activeTab === 'sales' ? 'page' : null" @click="selectTab('sales')">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <use href="#adm-i-history"></use>
+      </svg>
+      <span>Sales &amp; Voids</span>
+      <span class="adm-nav-badge" x-show="voidedTicketsCount() > 0" x-text="voidedTicketsCount()"></span>
+    </button>
+
+    <button type="button" class="adm-nav-item" :class="{ 'is-active': activeTab === 'menu' }"
+      :aria-current="activeTab === 'menu' ? 'page' : null" @click="selectTab('menu')">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <use href="#adm-i-book"></use>
+      </svg>
+      <span>Menu &amp; Recipes</span>
+    </button>
+
+    <button type="button" class="adm-nav-item" :class="{ 'is-active': activeTab === 'roastery' }"
+      :aria-current="activeTab === 'roastery' ? 'page' : null" @click="selectTab('roastery')">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <use href="#adm-i-box"></use>
+      </svg>
+      <span>Roastery &amp; Beans</span>
+      <span class="adm-nav-badge" x-show="lowStockBadgeCount() > 0" x-text="lowStockBadgeCount()"></span>
+    </button>
+
+    <button type="button" class="adm-nav-item" :class="{ 'is-active': activeTab === 'purchasing' }"
+      :aria-current="activeTab === 'purchasing' ? 'page' : null" @click="selectTab('purchasing')">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <use href="#adm-i-truck"></use>
+      </svg>
+      <span>Purchasing &amp; Suppliers</span>
+    </button>
+
+    <button type="button" class="adm-nav-item" :class="{ 'is-active': activeTab === 'analytics' }"
+      :aria-current="activeTab === 'analytics' ? 'page' : null" @click="selectTab('analytics')">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <use href="#adm-i-chart"></use>
+      </svg>
+      <span>Reports &amp; Analytics</span>
+    </button>
+
+    <button type="button" class="adm-nav-item" :class="{ 'is-active': activeTab === 'users' }"
+      :aria-current="activeTab === 'users' ? 'page' : null" @click="selectTab('users')">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <use href="#adm-i-users"></use>
+      </svg>
+      <span>Staff Users</span>
+      <span class="adm-nav-badge" x-show="users.length > 0" x-text="activeUsersCount()"></span>
+    </button>
+    {% else %}
+    <a href="/dashboard?tab=sales" class="adm-nav-item" x-show="isManager()">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <use href="#adm-i-history"></use>
+      </svg>
+      <span>Sales &amp; Voids</span>
+    </a>
+
+    <a href="/dashboard?tab=menu" class="adm-nav-item" x-show="isManager()">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <use href="#adm-i-book"></use>
+      </svg>
+      <span>Menu &amp; Recipes</span>
+    </a>
+
+    <a href="/dashboard?tab=roastery" class="adm-nav-item" x-show="isManager()">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <use href="#adm-i-box"></use>
+      </svg>
+      <span>Roastery &amp; Beans</span>
+      <span class="adm-nav-badge" x-show="lowStockBadgeCount() > 0" x-text="lowStockBadgeCount()"></span>
+    </a>
+
+    <a href="/dashboard?tab=purchasing" class="adm-nav-item" x-show="isManager()">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <use href="#adm-i-truck"></use>
+      </svg>
+      <span>Purchasing &amp; Suppliers</span>
+    </a>
+
+    <a href="/dashboard?tab=analytics" class="adm-nav-item" x-show="isManager()">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <use href="#adm-i-chart"></use>
+      </svg>
+      <span>Reports &amp; Analytics</span>
+    </a>
+
+    <a href="/dashboard?tab=users" class="adm-nav-item" x-show="isManager()">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <use href="#adm-i-users"></use>
+      </svg>
+      <span>Staff Users</span>
+    </a>
+    {% endif %}
+  </nav>
+
+  <div class="adm-shop-card">
+    <div class="adm-shop-art" aria-hidden="true">
+      <svg viewBox="0 0 160 80" width="160" height="80" fill="none" stroke="currentColor" stroke-linecap="round"
+        stroke-linejoin="round">
+        <g stroke-opacity="0.3" stroke-width="1.15">
+          <path d="M14 67C42 64.5 65 65.5 92 66.5C115 67 132 66.5 146 65" />
+          <path d="M18 39C34 38.5 46 41 57 45" />
+          <path d="M33 39C38 31 44 27 51 25.5" />
+          <path d="M44 41C49 35 55 32.5 61 33" />
+          <circle cx="117" cy="27" r="13.5" />
+          <rect x="128" y="49" width="9" height="9" rx="1.4" stroke-width="1" />
+          <path d="M130.8 52h3.4M132.5 52v4" stroke-width="1" />
+        </g>
+        <g stroke-width="1.35">
+          <path
+            d="M66 64.5C64.5 54 74 47.5 87 47.5C101 47.5 109 53.5 107.5 60.5C106.5 65 98 66.2 82 66.2C72 66.2 66.5 65.8 66 64.5Z" />
+          <path d="M75 61.5C79 60.5 84 61 87.5 63.5" stroke-opacity="0.55" stroke-width="1.1" />
+          <path
+            d="M66.8 51C67.2 44 67 37.5 66 33.5C63.5 32.8 59.5 31.5 58 29.5C57.2 28.3 58.6 27.3 61.5 27.6C65 28 68 28.8 70.5 30.5" />
+          <path d="M72.6 50.2C72.5 43.5 72.3 37.5 71.8 32" />
+          <path d="M71.5 30.5C74 27.5 78.2 27.2 79.2 28.8C78.5 31 74.8 32 71.5 30.5Z" />
+          <path d="M68.5 28.2C67.8 23.5 65.5 20.5 63.5 18.5" />
+          <path d="M70.2 28C70.5 22.5 73 18.5 75.8 15.5" />
+          <path d="M71.8 22.2C74 21 76.2 20 77.6 18.6" />
+        </g>
+      </svg>
+    </div>
+    <div class="adm-shop-meta">
+      <span>Main Bar &amp; Roastery</span>
+      <span class="adm-mono">08:00-19:00</span>
+    </div>
+  </div>
+
+  <div class="adm-sidebar-bottom">
+    <div class="adm-user-row">
+      <button type="button" class="adm-user-btn" @click="openProfileSettings()"
+        aria-label="Open profile and account settings" title="Profile &amp; Account Settings">
+        <span class="adm-avatar" aria-hidden="true">
+          <template x-if="user?.avatar_url">
+            <img :src="user.avatar_url" alt="" width="32" height="32" @error="$el.hidden = true">
+          </template>
+          <span x-show="!user?.avatar_url" x-text="userInitials(user?.full_name)"></span>
+        </span>
+        <span class="adm-user-meta">
+          <strong x-text="user?.full_name || 'Staff'"></strong>
+          <small x-text="user?.role || 'staff'"></small>
+        </span>
+        <svg class="adm-icon adm-user-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+          aria-hidden="true">
+          <use href="#adm-i-settings"></use>
+        </svg>
+      </button>
+      <button type="button" class="adm-btn is-ghost is-icon" @click="logout()" aria-label="Sign out" title="Sign out">
+        <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+          aria-hidden="true">
+          <use href="#adm-i-logout"></use>
+        </svg>
+      </button>
+    </div>
+  </div>
+</aside>
+{%- endmacro %}
+
+{% macro adm_profile_modal() -%}
+<div x-show="profileModalOpen" x-cloak x-transition:enter="adm-overlay-enter" x-transition:enter-start="adm-overlay-enter-start" x-transition:enter-end="adm-overlay-enter-end" x-transition:leave="adm-overlay-leave" x-transition:leave-start="adm-overlay-leave-start" x-transition:leave-end="adm-overlay-leave-end" class="adm-overlay no-print" @click.self="closeProfileSettings()" role="dialog"
+  aria-modal="true" aria-labelledby="adm-profile-title">
+  <section class="adm-modal adm-modal-account">
+    <div class="adm-modal-head">
+      <div>
+        <h2 id="adm-profile-title">Profile &amp; Account Settings</h2>
+        <p class="adm-cell-sub">Manage your email, profile photo, password, and sign-in methods.</p>
+      </div>
+      <button type="button" class="adm-btn is-ghost is-icon" @click="closeProfileSettings()"
+        aria-label="Close account settings">
+        <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+          aria-hidden="true">
+          <use href="#adm-i-close"></use>
+        </svg>
+      </button>
+    </div>
+
+    <div class="adm-seg adm-account-tabs" role="tablist" aria-label="Account settings sections">
+      <button type="button" role="tab" class="adm-seg-btn" :class="{ 'is-active': profileTab === 'profile' }"
+        :aria-selected="profileTab === 'profile'" @click="profileTab = 'profile'; profileError = ''">Profile &amp;
+        Photo</button>
+      <button type="button" role="tab" class="adm-seg-btn" :class="{ 'is-active': profileTab === 'security' }"
+        :aria-selected="profileTab === 'security'" @click="profileTab = 'security'; profileError = ''">Password &amp;
+        Auth</button>
+    </div>
+
+    <p class="adm-profile-error" x-show="profileError" x-text="profileError" role="alert"></p>
+
+    <!-- TAB 1: PROFILE, EMAIL & PHOTO -->
+    <form x-show="profileTab === 'profile'" @submit.prevent="saveProfileSettings()">
+      <div class="adm-profile-banner">
+        <span class="adm-avatar is-lg" aria-hidden="true">
+          <template
+            x-if="profileForm.avatar_url && (profileForm.avatar_url.startsWith('/') || /^https?:\/\//i.test(profileForm.avatar_url))">
+            <img :src="profileForm.avatar_url" alt="" width="44" height="44" @error="$el.hidden = true">
+          </template>
+          <span
+            x-show="!profileForm.avatar_url || !(profileForm.avatar_url.startsWith('/') || /^https?:\/\//i.test(profileForm.avatar_url))"
+            x-text="userInitials(profileForm.full_name || user?.full_name)"></span>
+        </span>
+        <div class="adm-profile-identity">
+          <strong x-text="user?.full_name || 'Staff Member'"></strong>
+          <span class="adm-mono" x-text="user?.email || ''"></span>
+          <span>Local PNG, JPG, or WebP · max 2 MB</span>
+        </div>
+        <div class="adm-actions">
+          <input type="file" accept="image/png,image/jpeg,image/webp" class="adm-sr-only" x-ref="avatarFileInput"
+            @change="uploadProfileAvatar($event)">
+          <button type="button" class="adm-btn" @click="$refs.avatarFileInput.click()" :disabled="avatarUploading"
+            x-text="avatarUploading ? 'Uploading...' : 'Upload Photo'"></button>
+          <button type="button" class="adm-btn is-danger-outline" x-show="profileForm.avatar_url"
+            @click="removeProfileAvatar()" :disabled="profileSaving || avatarUploading">Remove</button>
+        </div>
+      </div>
+
+      <div class="adm-form-grid">
+        <div class="adm-field">
+          <label for="prof-fullname">Full Name</label>
+          <input id="prof-fullname" class="adm-input" type="text" maxlength="100" x-model="profileForm.full_name"
+            required>
+        </div>
+        <div class="adm-field">
+          <label for="prof-username">Username</label>
+          <input id="prof-username" class="adm-input adm-mono" type="text" maxlength="50" x-model="profileForm.username"
+            placeholder="username">
+        </div>
+        <div class="adm-field is-full">
+          <label for="prof-email">Email Address</label>
+          <input id="prof-email" class="adm-input" type="email" maxlength="150" x-model="profileForm.email" required>
+        </div>
+      </div>
+
+      <div class="adm-modal-foot is-split">
+        <button type="button" class="adm-btn is-danger-outline" @click="logout()">Sign Out</button>
+        <div class="adm-actions">
+          <button type="button" class="adm-btn" @click="closeProfileSettings()">Cancel</button>
+          <button type="submit" class="adm-btn is-primary" :disabled="profileSaving"
+            x-text="profileSaving ? 'Saving...' : 'Save Profile'"></button>
+        </div>
+      </div>
+    </form>
+
+    <!-- TAB 2: PASSWORD & AUTHENTICATION METHODS -->
+    <div x-show="profileTab === 'security'" x-cloak>
+      <div class="adm-auth-methods">
+        <h3>Authentication Methods</h3>
+        <div class="adm-auth-row">
+          <div>
+            <strong>Email &amp; Password</strong>
+            <span class="adm-cell-sub"
+              x-text="user?.has_password ? 'Sign in with email or username and password' : 'No password set on this account yet'"></span>
+          </div>
+          <div class="adm-actions">
+            <span class="adm-status" :class="user?.has_password ? 'is-success' : 'is-muted'"
+              x-text="user?.has_password ? 'Active' : 'Not Set'"></span>
+            <button type="button" class="adm-btn is-danger-outline"
+              x-show="user?.has_password && (user?.oauth_accounts?.length || 0) > 0" @click="removePasswordAuth()"
+              :disabled="authActionBusy">Remove</button>
+          </div>
+        </div>
+
+        <template x-for="prov in ['google', 'discord']" :key="'auth-' + prov">
+          <div class="adm-auth-row">
+            <div>
+              <strong style="text-transform:capitalize;" x-text="prov + ' OAuth'"></strong>
+              <span class="adm-cell-sub adm-mono"
+                x-text="connectedOAuthEmail(prov) || (isOAuthConfigured(prov) ? 'Available on login page' : 'Not connected')"></span>
+            </div>
+            <div class="adm-actions">
+              <span class="adm-status" :class="connectedOAuthEmail(prov) ? 'is-success' : 'is-muted'"
+                x-text="connectedOAuthEmail(prov) ? 'Connected' : 'Not Connected'"></span>
+              <button type="button" class="adm-btn is-danger-outline"
+                x-show="connectedOAuthEmail(prov) && canRemoveAuthMethod()" @click="unlinkOAuthProvider(prov)"
+                :disabled="authActionBusy">Disconnect</button>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <form class="adm-profile-divider" @submit.prevent="savePasswordChange()">
+        <h3 x-text="user?.has_password ? 'Change Password' : 'Set Password Sign-In'"></h3>
+        <div class="adm-form-grid">
+          <div class="adm-field is-full" x-show="user?.has_password">
+            <label for="prof-cur-pass">Current Password</label>
+            <input id="prof-cur-pass" class="adm-input" type="password" autocomplete="current-password"
+              x-model="profileForm.current_password" :required="Boolean(user?.has_password)"
+              placeholder="Enter current password">
+          </div>
+          <div class="adm-field">
+            <label for="prof-new-pass">New Password (8+ chars)</label>
+            <input id="prof-new-pass" class="adm-input" type="password" minlength="8" autocomplete="new-password"
+              x-model="profileForm.new_password" required placeholder="At least 8 characters">
+          </div>
+          <div class="adm-field">
+            <label for="prof-confirm-pass">Confirm New Password</label>
+            <input id="prof-confirm-pass" class="adm-input" type="password" minlength="8" autocomplete="new-password"
+              x-model="profileForm.confirm_password" required placeholder="Repeat new password">
+          </div>
+        </div>
+
+        <div class="adm-modal-foot is-split">
+          <button type="button" class="adm-btn is-danger-outline" @click="logout()">Sign Out</button>
+          <div class="adm-actions">
+            <button type="button" class="adm-btn" @click="closeProfileSettings()">Close</button>
+            <button type="submit" class="adm-btn is-primary" :disabled="profileSaving"
+              x-text="profileSaving ? 'Updating...' : (user?.has_password ? 'Update Password' : 'Set Password')"></button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+{%- endmacro %}
+
+{% macro adm_receipt_modal(close_label='Close', focus_search=False) -%}
+<div x-show="receiptModal" x-cloak x-transition:enter="adm-overlay-enter" x-transition:enter-start="adm-overlay-enter-start" x-transition:enter-end="adm-overlay-enter-end" x-transition:leave="adm-overlay-leave" x-transition:leave-start="adm-overlay-leave-start" x-transition:leave-end="adm-overlay-leave-end" class="adm-overlay adm-receipt-overlay print-receipt-overlay" @click.self="receiptModal = null" role="dialog" aria-modal="true" aria-labelledby="receipt-heading">
+  <section class="adm-receipt-card print-receipt-card" tabindex="-1" x-effect="if (receiptModal) $nextTick(() => $el.focus())" @keydown.tab="const buttons = $el.querySelectorAll('button'); if (!buttons.length) return; if ($event.shiftKey && (document.activeElement === buttons[0] || document.activeElement === $el)) { $event.preventDefault(); buttons[buttons.length - 1].focus(); } else if (!$event.shiftKey && (document.activeElement === buttons[buttons.length - 1] || document.activeElement === $el)) { $event.preventDefault(); buttons[0].focus(); }">
+    <div class="adm-receipt-success no-print" aria-hidden="true">
+      <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><use href="#adm-i-check-plain"></use></svg>
+    </div>
+    <p class="adm-receipt-eyebrow">A little happiness, on its way</p>
+    <h2 id="receipt-heading" class="adm-receipt-brand" x-text="receiptModal?.store_name || 'Shika Coffee'"></h2>
+    <p class="adm-mono adm-receipt-inv" x-text="receiptModal?.invoice_number || ''"></p>
+    <div class="adm-receipt-meta">
+      <p><span>Customer</span><strong x-text="receiptModal?.customer_name || 'Guest'"></strong></p>
+      <p class="is-right"><span>Cashier</span><strong x-text="receiptModal?.cashier || 'Staff'"></strong></p>
+    </div>
+    <ul class="adm-receipt-items">
+      <template x-for="(it, idx) in receiptModal?.items || []" :key="'rc-' + idx">
+        <li>
+          <div>
+            <span x-text="it.qty + ' × ' + it.name"></span>
+            <strong x-text="formatMoney(it.subtotal)"></strong>
+          </div>
+          <p x-show="it.notes" x-text="it.notes"></p>
+        </li>
+      </template>
+    </ul>
+    <dl class="adm-receipt-totals">
+      <div><dt>Subtotal</dt><dd x-text="formatMoney(receiptModal?.subtotal)"></dd></div>
+      <div x-show="Number(receiptModal?.discount || 0) > 0"><dt>Discount</dt><dd x-text="'-' + formatMoney(receiptModal?.discount)"></dd></div>
+      <div><dt>Tax</dt><dd x-text="formatMoney(receiptModal?.tax)"></dd></div>
+      <div class="adm-receipt-grand"><dt>Total</dt><dd x-text="formatMoney(receiptModal?.total_amount)"></dd></div>
+      <div><dt>Paid (<span x-text="receiptModal?.payment_method"></span>)</dt><dd x-text="formatMoney(receiptModal?.amount_paid)"></dd></div>
+      <div><dt>Change</dt><dd x-text="formatMoney(receiptModal?.change_amount)"></dd></div>
+    </dl>
+    <p class="adm-receipt-thanks">Thank you for making a little time for Shika.</p>
+    <div class="adm-receipt-actions no-print">
+      <button type="button" @click="triggerReceiptPrint(receiptModal?.invoice_number)" class="adm-btn is-primary">Print receipt</button>
+      <button type="button" @click="receiptModal = null{% if focus_search %}; $nextTick(() => $refs.menuSearch.focus()){% endif %}" class="adm-btn">{{ close_label }}</button>
+    </div>
+  </section>
+</div>
+{%- endmacro %}
+
+{% macro adm_print_popup() -%}
+<div x-show="printPopup.show" x-cloak x-transition:enter="adm-print-enter"
+  x-transition:enter-start="adm-print-enter-start" x-transition:enter-end="adm-print-enter-end"
+  x-transition:leave="adm-print-leave" x-transition:leave-start="adm-print-leave-start"
+  x-transition:leave-end="adm-print-leave-end" class="adm-print-popup no-print" role="status" aria-live="polite">
+  <span class="adm-print-icon" aria-hidden="true">
+    <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+      <use href="#adm-i-check"></use>
+    </svg>
+  </span>
+  <div class="adm-print-copy">
+    <span>Receipt printed</span>
+    <template x-if="printPopup.invoice">
+      <span class="adm-print-sep" aria-hidden="true">·</span>
+    </template>
+    <span class="adm-mono adm-print-inv" x-show="printPopup.invoice" x-text="printPopup.invoice"></span>
+  </div>
+  <button type="button" class="adm-print-close" @click="dismissPrintPopup()" aria-label="Dismiss print confirmation">
+    <svg class="adm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+      <use href="#adm-i-close"></use>
+    </svg>
+  </button>
+</div>
+{%- endmacro %}
